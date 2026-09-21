@@ -1,0 +1,25 @@
+# 依赖与产物
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+
+# 本地数据：law.db 会话库、法条全文库、日志（均可由 tools/ 重建）
+backend/data/
+backend/logs/
+*.db
+*.db-wal
+*.db-shm
+
+# 密钥
+backend/config.json
+.env
+.token.txt
+
+# 临时预览码（会过期，不进仓库）
+mp_preview.png
+docs/preview_qr.png
+
+# 一次性验证脚本的输出
+backend/test_split_out.txt

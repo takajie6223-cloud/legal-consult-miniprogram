@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>loading</title>
+<style>
+  html,body{margin:0;padding:0;background:#fff;overflow:hidden}
+  iframe{width:100vw;height:100vh;border:0;display:block}
+</style>
+</head>
+<body>
+<iframe id="f"></iframe>
+<script>
+// 截图驱动页：同源 iframe 里跑真实 H5 产物，按 query 参数把界面点到目标状态，
+// 完成后把 document.title 置为 READY，供 tools/shot.mjs 轮询后抓图。
+const p = new URLSearchParams(location.search);
+localStorage.setItem("agreed", "1");
+const f = document.getElementById("f");
+f.src = "/#" + (p.get("page") || "/pages/index/index");
+
+const D = () => f.contentDocument;
+const SAMPLE_CONTRACT = `第一条 甲方：杭州某某科技有限公司；乙方：张三。
+第二条 乙方入职后试用期 8 个月，试用期工资为正式工资的 60%。
+第三条 乙方如提前离职，须向甲方支付违约金 50000 元，且甲方有权不退还已收取的押金 3000 元。
+第四条 甲方有权根据经营需要随时调整乙方的岗位和薪酬，乙方不得异议。
+第五条 因履行本合同发生争议的，由甲方所在地人民法院管辖，本合同不适用《劳动合同法》。
+第六条 本合同自双方签字之日起生效，一式两份。`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function wait(ms, what) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    const el = D().querySelector(what);
+    if (el) return el;
+    await sleep(200);
+  }
+  throw new Error("timeout waiting " + what);
+}
+function tap(el) {
+  const r = el.getBoundingClientRect();
+  const opt = { bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+  for (const t of ["touchstart", "touchend"]) {
+    try { el.dispatchEvent(new TouchEvent(t, Object.assign({ touchEvent: {} }, opt))); } catch (e) {}
+  }
+  el.dispatchEvent(new MouseEvent("mousedown", opt));
+  el.dispatchEvent(new MouseEvent("mouseup", opt));
+  el.dispatchEvent(new MouseEvent("click", opt));
+}
+
+// uni H5 把 <input>/<textarea> 包成 <uni-input><input></uni-input>，v-model 只听内层原生事件
+function setValue(el, value) {
+  const proto = el.tagName === "TEXTAREA" ? f.contentWindow.HTMLTextAreaElement : f.contentWindow.HTMLInputElement;
+  el.focus();
+  Object.getOwnPropertyDescriptor(proto.prototype, "value").set.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+const ipt = (sel) => D().querySelector(sel + " input") || D().querySelector(sel + " textarea") || D().querySelector(sel);
+
+async function fillForm(map) {
+  const fields = [...D().querySelectorAll(".f")];
+  for (const el of fields) {
+    const lbl = (el.querySelector(".f-l") || {}).textContent || "";
+    for (const key in map) {
+      if (lbl.indexOf(key) >= 0) { setValue(ipt(".ta", el) || el.querySelector(".ta"), map[key]); break; }
+      const i = el.querySelector(".ipt");
+      if (i && lbl.indexOf(key) >= 0) { setValue(i, map[key]); break; }
+    }
+  }
+}
+
+f.onload = async () => {
+  try {
+    const act = p.get("act");
+    let info = "";
+    if (act === "ask" || act === "askq") {
+      await wait(20000, act === "ask" ? ".cell" : ".input textarea");
+      if (act === "ask") {
+        tap(D().querySelectorAll(".cell")[Number(p.get("cell") || 0)]);
+      } else {
+        // 直接往输入框里写自定义问题，用于演示案情要素引导这类需要长句的场景
+        const ta = D().querySelector(".input textarea");
+        Object.getOwnPropertyDescriptor(f.contentWindow.HTMLTextAreaElement.prototype, "value").set.call(ta, p.get("q") || "");
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      await wait(5000, ".send");
+      await sleep(400);
+      tap(D().querySelector(".send"));
+      await wait(120000, ".cites-head");
+      await sleep(1200);
+      if (p.get("expand") !== "0") { tap(D().querySelector(".cites-head")); await sleep(900); }
+      // 追问建议要等模型返回（最长 12s），拿不到也照常出图
+      try { await wait(Number(p.get("foll") || 18000), ".foll-q"); } catch (e) {}
+      info = "foll=" + D().querySelectorAll(".foll-q").length + " el=" + D().querySelectorAll(".el-row").length;
+      if (p.get("scroll") === "end") {
+        // 长回答要看底部的追问/要素卡。scroll-view 的 scroll-into-view 会把位置顶回去，
+        // 所以持续压 1.5s 直到停在底部。
+        const sv = D().querySelector(".msgs .uni-scroll-view") || D().querySelector(".msgs");
+        for (let i = 0; i < 10; i++) {
+          sv.scrollTop = sv.scrollHeight;
+          await sleep(150);
+        }
+      }
+      await sleep(600);
+    } else if (act === "laws") {
+      await wait(20000, ".si");
+      // uni H5 的 <input> 渲染成 <uni-input><input></uni-input>，v-model 只听内层原生 input 事件
+      const i = D().querySelector(".si input") || D().querySelector(".si");
+      i.focus();
+      Object.getOwnPropertyDescriptor(f.contentWindow.HTMLInputElement.prototype, "value").set.call(i, p.get("q") || "");
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(300);
+      tap(D().querySelector(".go"));
+      await wait(60000, p.get("card") === "0" ? ".none" : ".cc");
+      await sleep(1000);
+    } else if (act === "contract") {
+      await wait(20000, ".ta textarea");
+      const ta0 = D().querySelector(".ta textarea") || D().querySelector(".ta");
+      Object.getOwnPropertyDescriptor(f.contentWindow.HTMLTextAreaElement.prototype, "value").set.call(ta0, SAMPLE_CONTRACT);
+      ta0.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(400);
+      tap(D().querySelector(".btn"));
+      await wait(120000, ".risk");
+      info = "risks=" + D().querySelectorAll(".risk").length;
+      await sleep(800);
+    } else if (act === "upload") {
+      // 真实链路：截获页面自己创建的 <input type=file> 的 click，把 txt 塞进 files 并派发 change，
+      // 之后页面自己走 uni.uploadFile → /api/contract/extract → 正文回填，不 mock 任何一步。
+      await wait(20000, ".upl");
+      const TXT = SAMPLE_CONTRACT;
+      const W = f.contentWindow;
+      const dt = new DataTransfer();
+      dt.items.add(new File([new TextEncoder().encode(TXT)], "劳动合同样本.txt", { type: "text/plain" }));
+      W.HTMLInputElement.prototype.click = function () {
+        Object.getOwnPropertyDescriptor(W.HTMLInputElement.prototype, "files").set.call(this, dt.files);
+        this.dispatchEvent(new W.Event("change", { bubbles: true }));
+      };
+      tap(D().querySelector(".upl"));
+      await wait(40000, ".imp");
+      const ta = D().querySelector(".ta textarea") || {};
+      info = D().querySelector(".imp").textContent.trim() + " | 正文 " + (ta.value || "").length + " 字";
+      await sleep(600);
+    } else if (act === "document") {
+      await wait(20000, ".f textarea");
+      const vals = ["张三，男，1990年1月1日出生，汉族，住杭州市西湖区XX路XX号，公民身份号码33010619900101001X，电话13800000000。",
+        "杭州某某贸易有限公司，统一社会信用代码91330100MA2XXXX00X，住所地杭州市滨江区XX路20号，法定代表人李四，执行董事。",
+        "民间借贷纠纷", "杭州市西湖区人民法院",
+        "判令被告偿还借款本金人民币 80000 元；\n判令被告支付自 2025 年 1 月 1 日起按一年期 LPR 计算至实际清偿之日止的利息；",
+        "2024 年 6 月 1 日，原告与被告签订《借款协议》，约定被告向原告借款人民币 80000 元，2024 年 12 月 31 日前一次性归还，未约定利息。\n原告于当日通过银行转账向被告账户支付 80000 元，有转账凭证为据。\n还款期届满后，原告多次催要，被告以资金紧张为由拒绝归还，至今分文未付。",
+        "借款协议原件一份，证明借贷关系成立；\n银行转账回单一份，证明原告已实际交付出借款项；\n微信催款记录一组，证明原告多次主张权利、诉讼时效中断。",
+        "张三"];
+      // 表单按 spec 顺序渲染，逐个 .f 找里面的原生控件填示例值
+      const fs2 = D().querySelectorAll(".f");
+      for (let i = 0; i < fs2.length && i < vals.length; i++) {
+        const el = fs2[i].querySelector("textarea") || fs2[i].querySelector("input");
+        if (!el) continue;
+        const proto = el.tagName === "TEXTAREA" ? f.contentWindow.HTMLTextAreaElement.prototype : f.contentWindow.HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value").set.call(el, vals[i]);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      await sleep(400);
+      tap(D().querySelector(".btn"));
+      await wait(120000, ".doc-body");
+      info = "doc=ok";
+      if (p.get("then") === "ask") {
+        // 验证文书页的「就这份文书去咨询」：摘要要带上文书名、双方和请求项数
+        await wait(20000, ".askbtn");
+        tap(D().querySelector(".askbtn"));
+        await wait(60000, ".input textarea");
+        let v = "";
+        for (let i = 0; i < 60; i++) {
+          v = D().querySelector(".input textarea").value;
+          if (v && v[0] === "【") break;
+          await sleep(250);
+        }
+        info += " 输入框=" + v.length + "字 " + v.replace(/\n/g, " / ");
+      }
+      await sleep(800);
+    } else if (act === "fee") {
+      await wait(20000, ".ipt input");
+      const el = D().querySelector(".ipt input");
+      Object.getOwnPropertyDescriptor(f.contentWindow.HTMLInputElement.prototype, "value").set.call(el, p.get("amount") || "100000");
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(600);
+      tap(D().querySelector(".btn"));
+      // 页面进来自带一次 amount=0 的计算结果，等带明细的那一版渲染出来
+      await wait(60000, ".item-c");
+      tap(D().querySelector(".item-c"));
+      info = "total=" + D().querySelector(".total-n").textContent;
+      await sleep(800);
+    } else if (act === "askbtn") {
+      // 只把「带结果去咨询」按钮滚进视口，证明入口在结果卡片底部
+      await wait(20000, ".askbtn");
+      const b = D().querySelector(".askbtn");
+      b.scrollIntoView({ block: "center" });
+      info = "btn=" + b.textContent.trim();
+      await sleep(700);
+    } else if (act === "toask") {
+      // 「带结果去咨询」真链路：点按钮 → switchTab 回首页 → onShow 取出 ask_draft 填进输入框
+      await wait(20000, ".askbtn");
+      const before = (p.get("page") || "").split("/").pop();
+      tap(D().querySelector(".askbtn"));
+      await wait(60000, ".input textarea");
+      let v = "";
+      for (let i = 0; i < 60; i++) {
+        v = D().querySelector(".input textarea").value;
+        if (v && v[0] === "【") break;
+        await sleep(250);
+      }
+      info = `from=${before} 输入框=${v.length}字 ${v.slice(0, 24)}`;
+      // H5 的 tabbar 是 fixed 的，会盖住页面底部 50px 的输入区（小程序里 tabbar 是原生的，不重叠）
+      const tb = D().querySelector(".uni-tabbar") || D().querySelector("uni-tabbar");
+      if (tb) tb.remove();
+      await sleep(700);
+    } else if (act === "browse") {
+      await wait(20000, ".lawitem");
+      tap(D().querySelectorAll(".lawitem")[Number(p.get("law") || 0)]);
+      await wait(60000, ".art");
+      await sleep(1200);
+    } else if (act === "wait") {
+      await wait(20000, p.get("sel") || ".page");
+      await sleep(Number(p.get("hold") || 1500));
+    }
+    document.title = "READY" + (info ? " " + info : "");
+  } catch (e) {
+    document.title = "ERR " + e.message;
+  }
+};
+</script>
+</body>
+</html>

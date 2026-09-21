@@ -1,0 +1,15 @@
+{
+  "ollamaBase": "http://127.0.0.1:11434",
+  "legalModel": "qwen3.5:9b-legal",
+  "allm": {
+    "apiKey": "REPLACE_WITH_ANYTHINGLLM_API_KEY",
+    "portCandidates": [3001],
+    "workspaceSlug": "REPLACE_WITH_YOUR_WORKSPACE_SLUG"
+  },
+  "wechat": {
+    "appid": "",
+    "secret": ""
+  },
+  "jwtSecret": "CHANGE_ME__generate_with_python_secrets_token_urlsafe_32",
+  "port": 9100
+}

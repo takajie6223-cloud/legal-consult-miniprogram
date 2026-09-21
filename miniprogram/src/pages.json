@@ -1,0 +1,31 @@
+{
+  "pages": [
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "法律咨询" } },
+    { "path": "pages/laws/laws", "style": { "navigationBarTitleText": "法条速查" } },
+    { "path": "pages/tools/tools", "style": { "navigationBarTitleText": "实用工具" } },
+    { "path": "pages/history/history", "style": { "navigationBarTitleText": "咨询记录" } },
+    { "path": "pages/lawdetail/lawdetail", "style": { "navigationBarTitleText": "法条详情" } },
+    { "path": "pages/fee/fee", "style": { "navigationBarTitleText": "诉讼费计算器" } },
+    { "path": "pages/limit/limit", "style": { "navigationBarTitleText": "诉讼时效计算器" } },
+    { "path": "pages/contract/contract", "style": { "navigationBarTitleText": "合同审查" } },
+    { "path": "pages/document/document", "style": { "navigationBarTitleText": "文书生成" } },
+    { "path": "pages/agreement/agreement", "style": { "navigationBarTitleText": "免责声明" } }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#f5f7fb",
+    "backgroundColor": "#f5f7fb"
+  },
+  "tabBar": {
+    "color": "#8a8f99",
+    "selectedColor": "#3b6cf0",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "咨询" },
+      { "pagePath": "pages/laws/laws", "text": "法条" },
+      { "pagePath": "pages/tools/tools", "text": "工具" },
+      { "pagePath": "pages/history/history", "text": "记录" }
+    ]
+  }
+}

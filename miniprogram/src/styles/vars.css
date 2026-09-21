@@ -1,0 +1,48 @@
+/* 全站设计变量：更轻的圆角卡片风。在 App.vue 里全局引入。 */
+page {
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --radius: 28rpx;
+  --radius-sm: 16rpx;
+  --shadow: 0 6rpx 24rpx rgba(31, 45, 80, 0.06);
+  --primary: #3b6cf0;
+  --primary-soft: #eef2ff;
+  --text: #1c1f26;
+  --muted: #8a8f99;
+  --line: #eef0f5;
+  --warn: #c9821f;
+  --danger: #d9534f;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 28rpx;
+  line-height: 1.65;
+}
+
+/* 小程序默认 content-box，卡片一加内边距就横向溢出，全站统一按 border-box 算 */
+view, text, button, input, textarea, scroll-view { box-sizing: border-box; }
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28rpx;
+}
+
+.muted { color: var(--muted); }
+.chip {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  line-height: 34rpx;
+}
+/* 引用徽标在首页气泡和法条页都会用到，样式必须放全局，放组件里小程序端取不到 */
+.chip-law { background: var(--primary-soft); color: var(--primary); }
+.chip-case { background: #f0f2f6; color: #5b6474; }
+/* 两列卡片：宽度用 calc，写死 rpx 会在 750 设计宽度下溢出半个字 */
+.cell2 { width: calc(50% - 10rpx); }
+/* 「带结果去咨询」按钮四个工具页都有，同理必须放全局 */
+.askrow { margin-top: 24rpx; padding-top: 18rpx; border-top: 1rpx solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+.askbtn { font-size: 25rpx; color: var(--primary); font-weight: 600; }
+/* 结果页的「保存分享图」与上面并排，同样跨四个页面共用 */
+.sharebtn { font-size: 25rpx; color: var(--muted); }

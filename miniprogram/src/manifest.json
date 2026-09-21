@@ -1,0 +1,18 @@
+{
+  "name": "法律咨询助手",
+  "appid": "",
+  "description": "基于本地大模型 + 法律知识库的咨询服务（体验用）",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "requiredPrivateInfos": []
+  },
+  "h5": { "title": "法律咨询助手" }
+}

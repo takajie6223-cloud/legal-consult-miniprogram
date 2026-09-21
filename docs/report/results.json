@@ -1,0 +1,1228 @@
+{
+ "generated_at": "2026-09-22 00:34:57",
+ "base": "http://127.0.0.1:9100",
+ "groups": [
+  {
+   "id": "auth",
+   "title": "登录与鉴权",
+   "note": "所有工具接口都要带 Bearer token；未登录一律 401。",
+   "api": "",
+   "cases": [
+    {
+     "name": "登录发 token",
+     "input": "POST /api/auth/login {code:''}",
+     "expected": "200 + 非空 JWT + user_id",
+     "actual": "200 + token 非空(JWT 3 段) + user_id=有",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "无 token 访问工具接口被拒",
+     "input": "GET /api/fee/meta（不带 Authorization）",
+     "expected": "401",
+     "actual": "401",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "伪造 token 被拒",
+     "input": "GET /api/fee/meta {Authorization: Bearer abc.def.ghi}",
+     "expected": "401",
+     "actual": "401",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "meta 接口清单",
+     "input": "GET /api/fee/meta, /api/limit/meta, /api/document/spec",
+     "expected": "8 / 6 / 3",
+     "actual": "8 / 6 / 3",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "接口响应时间（本地回环）",
+     "input": "GET /api/health × 3",
+     "expected": "< 500ms",
+     "actual": "3 次 ['1ms', '1ms', '1ms']",
+     "ok": true,
+     "prio": "P1"
+    }
+   ]
+  },
+  {
+   "id": "laws",
+   "title": "法条库检索（laws.db）",
+   "note": "52,116 条 / 1,207 部（含 333 部司法解释），FTS5 重叠二元组索引 + 口语同义词扩展。期望条号/法名由出题人对照现行文本人工确认。",
+   "api": "/api/laws/*",
+   "cases": [
+    {
+     "name": "库规模与 SQLite 实测一致",
+     "input": "GET /api/laws/meta ＋ 本地 sqlite3 COUNT(*)",
+     "expected": "接口数字 = 库内数字",
+     "actual": "接口 1207 部 / 52116 条 / 目录 500 项；绕开接口直接 COUNT(*)：1207 部 / 52116 条",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "口语词 → 劳动合同法第19条（试用期上限）",
+     "input": "GET /api/laws/search?q=试用期",
+     "expected": "命中《劳动合同法》第19条，正文含「六个月」",
+     "actual": "「试用期」→ 8 命中，Top4：《中华人民共和国民法典》第六百三十八条、《中华人民共和国劳动法》第二十一条、《中华人民共和国民法典》第六百三十七条、《中华人民共和国劳动法》第三十二条；目标条正文 195 字，含「六个月」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "条号直查 → 民法典第188条",
+     "input": "GET /api/laws/search?q=民法典第188条",
+     "expected": "命中《民法典》第188条，正文含「诉讼时效」",
+     "actual": "「民法典第188条」→ 8 命中，Top4：《中华人民共和国民法典》第一百八十八条、《最高人民法院关于适用《中华人民共和国民法典》第二十条、《最高人民法院关于适用《中华人民共和国民法典》第一条、《最高人民法院关于适用《中华人民共和国民法典》第二十一条；目标条正文 143 字，含「诉讼时效」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "刑案 → 刑法第234条（故意伤害）",
+     "input": "GET /api/laws/search?q=故意伤害",
+     "expected": "命中《刑法》第234条，正文含「故意伤害他人身体」",
+     "actual": "「故意伤害」→ 8 命中，Top4：《中华人民共和国刑法》第十七条、《中华人民共和国刑法》第二百三十四条、《中华人民共和国治安管理处罚法》第四十三条、《最高人民法院关于审理未成年人刑事案件具体应用法律若干问题的解释》第十条；目标条正文 110 字，含「故意伤害他人身体」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "合同类 → 民法典第585条（违约金）",
+     "input": "GET /api/laws/search?q=违约金怎么约定",
+     "expected": "命中《民法典》第585条，正文含「违约金」",
+     "actual": "「违约金怎么约定」→ 8 命中，Top4：《中华人民共和国民法典》第八百七十三条、《中华人民共和国民法典》第五百八十五条、《中华人民共和国民法典》第三百八十九条、《最高人民法院关于审理民间借贷案件适用法律若干问题的规定》第二十九条；目标条正文 175 字，含「违约金」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "事故类 → 道交法第74条（赔偿争议处理）",
+     "input": "GET /api/laws/search?q=交通事故赔偿",
+     "expected": "命中《道路交通安全法》第74条，正文含「损害赔偿」",
+     "actual": "「交通事故赔偿」→ 8 命中，Top4：《中华人民共和国道路交通安全法》第七十条、《中华人民共和国道路交通安全法实施条例》第九十四条、《道路交通事故处理程序规定》第九十一条、《道路交通事故处理程序规定》第九十三条；目标条正文 103 字，含「损害赔偿」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "劳动类 → 仲裁法第9条（欠薪救济）",
+     "input": "GET /api/laws/search?q=拖欠工资",
+     "expected": "命中《劳动争议调解仲裁法》第9条，正文含「劳动报酬」",
+     "actual": "「拖欠工资」→ 8 命中，Top4：《保障农民工工资支付条例》第五十条、《保障农民工工资支付条例》第十条、《中华人民共和国劳动争议调解仲裁法》第九条、《中华人民共和国劳动争议调解仲裁法》第十六条；目标条正文 74 字，含「劳动报酬」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "物业类 → 民法典第944条（支付物业费）",
+     "input": "GET /api/laws/search?q=物业费不交",
+     "expected": "命中《民法典》第944条，正文含「物业费」",
+     "actual": "「物业费不交」→ 8 命中，Top4：《中华人民共和国民法典》第九百四十四条、《中华人民共和国民法典》第九百五十条、《中华人民共和国民法典》第二百八十六条、《最高人民法院关于审理物业服务纠纷案件适用法律若干问题的解释》第三条；目标条正文 171 字，含「物业费」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "工伤类 → 工伤保险条例第18条（申请材料）",
+     "input": "GET /api/laws/search?q=工伤认定",
+     "expected": "命中《工伤保险条例》第18条，正文含「工伤认定申请」",
+     "actual": "「工伤认定」→ 8 命中，Top4：《工伤保险条例》第二十条、《工伤保险条例》第十八条、《最高人民法院关于审理工伤保险行政案件若干问题的规定》第九条、《最高人民法院关于审理工伤保险行政案件若干问题的规定》第七条；目标条正文 213 字，含「工伤认定申请」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "易混词 → 民法典第586条（定金）",
+     "input": "GET /api/laws/search?q=定金和订金",
+     "expected": "命中《民法典》第586条，正文含「定金」",
+     "actual": "「定金和订金」→ 8 命中，Top4：《中华人民共和国民法典》第五百八十六条、《中华人民共和国民法典》第五百八十七条、《最高人民法院关于审理民事、行政诉讼中司法赔偿案件适用法律若干问题的解释》第二条、《最高人民法院关于民事、行政诉讼中司法赔偿若干问题的解释》第二条；目标条正文 118 字，含「定金」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "家事类 → 民法典第1084条（离婚后子女抚养）",
+     "input": "GET /api/laws/search?q=孩子抚养权",
+     "expected": "命中《民法典》第1084条，正文含「抚养」",
+     "actual": "「孩子抚养权」→ 8 命中，Top4：《中华人民共和国未成年人保护法》第二十四条、《外国人在中华人民共和国收养子女登记办法》第五条、《中华人民共和国民法典》第一千零七十四条、《中华人民共和国民法典》第一千零八十四条；目标条正文 177 字，含「抚养」=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "纯口语且库内无字面命中 → 空结果而非硬凑",
+     "input": "GET /api/laws/search?q=欠钱不还 / 辞退赔偿 / 噪音扰民",
+     "expected": "均返回 200 + 0 命中",
+     "actual": "HTTP 全部 200，命中数 {'欠钱不还': 0, '辞退赔偿': 0, '噪音扰民': 0}（设计上不硬凑法条，交给类案向量通道）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "同义词扩展命中质量（已知不足）",
+     "input": "GET /api/laws/search?q=房租押金不退 / 加班费",
+     "expected": "接口 200，命中情况如实记录",
+     "actual": "「房租押金不退」Top3：人民检察院刑事诉讼规则第五百七十条、人民检察院刑事诉讼规则（试行）第五百七十七条、人民检察院刑事诉讼规则（试行）第五百六十五条——非空但目标条未进前列，列入报告「已知不足」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "同义词扩展命中质量 2（已知不足）",
+     "input": "GET /api/laws/search?q=加班费",
+     "expected": "接口 200，命中情况如实记录",
+     "actual": "「加班费」Top3：劳动合同法第八十五条、劳动法第四十一条、劳动法第六十三条——非空但目标条未进前列，列入报告「已知不足」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "整部浏览：民法典前 30 条按条号升序",
+     "input": "GET /api/laws/browse?law=中华人民共和国民法典&limit=30",
+     "expected": "30 条、全是民法典、首条为第 1 条",
+     "actual": "30 条，条号 [1, 2, 3, 4, 5]…[29, 30]，分编=['总则']，升序且属于民法典=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "分编 + 翻页偏移正确",
+     "input": "GET /api/laws/browse?law=民法典&part=合同编&offset=100",
+     "expected": "10 条、属合同编、条号递增",
+     "actual": "分页 offset=100 取到 10 条，区间 第五百六十三条→第五百七十二条，升序=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "详情 + 上下条文窗口（188 条前后各 3 条）",
+     "input": "GET /api/laws/{id} , /api/laws/{id}/context?span=3",
+     "expected": "before=186,187 序、after 起于第189条、正文含「诉讼时效」",
+     "actual": "详情=《中华人民共和国民法典》总则 第一百八十八条（2021-01-01施行，正文 143 字）；上下文 第一百八十五条~第一百八十七条 / 第一百八十九条~第一百九十一条",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "不存在的条文 id → 404",
+     "input": "GET /api/laws/99999999",
+     "expected": "404",
+     "actual": "404",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "空关键词 → 422 参数校验",
+     "input": "GET /api/laws/search?q=",
+     "expected": "422",
+     "actual": "422",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "fee",
+   "title": "诉讼费计算器",
+   "note": "依据《诉讼费用交纳办法》（国务院令第 481 号）第 13、14、15、16 条。期望值由本脚本另一套分段表独立复算，不共用被测代码。",
+   "api": "POST /api/fee",
+   "cases": [
+    {
+     "name": "财产案件 1 万元（临界）",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 10000}",
+     "expected": "50 元（不超过1万元：每件 50 元）",
+     "actual": "total=50；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 50",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 1.05 万元",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 10500}",
+     "expected": "62.50 元（50 + 500×2.5%）",
+     "actual": "total=62.50；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 62.50",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 10 万元",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 100000}",
+     "expected": "2,300 元（50 + 90,000×2.5%）",
+     "actual": "total=2,300；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 2,300",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 50 万元",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 500000}",
+     "expected": "8,800 元（50+2,250+2,000+4,500）",
+     "actual": "total=8,800；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 8,800",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 100 万元",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 1000000}",
+     "expected": "13,800 元（上项 + 500,000×1%）",
+     "actual": "total=13,800；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 13,800",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 500 万元",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 5000000}",
+     "expected": "46,800 元（上项 + 9,000 + 24,000）",
+     "actual": "total=46,800；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 46,800",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 2,000 万元",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 20000000}",
+     "expected": "141,800 元（…+ 1,000万-2,000万×0.6%）",
+     "actual": "total=141,800；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 141,800",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "财产案件 5,000 万元（末档 0.5%）",
+     "input": "POST /api/fee {\"case_type\": \"property\", \"amount\": 50000000}",
+     "expected": "291,800 元（上项 + 3,000万×0.5%）",
+     "actual": "total=291,800；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 291,800",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "离婚案件（财产 40 万）",
+     "input": "POST /api/fee {\"case_type\": \"divorce\", \"property_amount\": 400000}",
+     "expected": "1,200 元（200 + 200,000×0.5%）",
+     "actual": "total=1,200；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 1,200",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "离婚案件（财产 18 万，不另收）",
+     "input": "POST /api/fee {\"case_type\": \"divorce\", \"property_amount\": 180000}",
+     "expected": "200 元（≤20万只收按件 200 元）",
+     "actual": "total=200；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 200",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "人格权案件（损害 15 万）",
+     "input": "POST /api/fee {\"case_type\": \"personality\", \"damages\": 150000}",
+     "expected": "1,050 元（300 + 5万×1% + 5万×0.5%）",
+     "actual": "total=1,050；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 1,050",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "劳动争议案件",
+     "input": "POST /api/fee {\"case_type\": \"labor\"}",
+     "expected": "10 元（每件 10 元）",
+     "actual": "total=10；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 10",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "知产民事（无争议金额）",
+     "input": "POST /api/fee {\"case_type\": \"ip\"}",
+     "expected": "750 元（每件 500~1000，取中值 750）",
+     "actual": "total=750；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 750",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "知产民事（有金额 30 万，按财产标准）",
+     "input": "POST /api/fee {\"case_type\": \"ip\", \"amount\": 300000}",
+     "expected": "5,800 元（50+2,250+2,000+1,500）",
+     "actual": "total=5,800；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 5,800",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "其他非财产案件",
+     "input": "POST /api/fee {\"case_type\": \"other_nonproperty\"}",
+     "expected": "75 元（每件 50~100，取中值 75）",
+     "actual": "total=75；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 75",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "商标/专利/海事行政案件",
+     "input": "POST /api/fee {\"case_type\": \"admin_special\"}",
+     "expected": "100 元（每件 100 元）",
+     "actual": "total=100；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 100",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "其他行政案件",
+     "input": "POST /api/fee {\"case_type\": \"admin_other\"}",
+     "expected": "50 元（每件 50 元）",
+     "actual": "total=50；分段核对=一致；依据=带诉讼费用交纳办法；案件受理费 50",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "组合：财产10万 + 保全20万 + 执行10万 + 简易程序减半",
+     "input": "POST /api/fee {amount:100000, preserve:200000, execute:100000, simple:true}",
+     "expected": "受理费 2,300、减半 −1,150、保全 1,520（30+990+500）、执行 1,400 → 合计 4,070",
+     "actual": "受理费 2,300 − 简易减半 1,150 + 保全 1,520 + 执行 1,400 = 4,070；理由=适用简易程序审理",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "支付令申请费 = 财产案件受理费的 1/3",
+     "input": "POST /api/fee {amount:300000, payment_order:true}",
+     "expected": "受理费 5,800 → 支付令 1,933.33，合计 7,733.33",
+     "actual": "受理费 5,800，支付令 1,933.33（=受理费×1/3），合计 7,733.33",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "管辖权异议（不成立）另收 50~100，取中值",
+     "input": "POST /api/fee {amount:100000, jurisdiction_objection:true}",
+     "expected": "合计 2,375",
+     "actual": "受理费 2,300 + 管辖权异议 75 = 2,375",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "调解 + 撤诉同勾：受理费只减半一次（不叠成 1/4）",
+     "input": "POST /api/fee {amount:100000, mediation:true, withdrawal:true}",
+     "expected": "合计 1,150，理由 2 条",
+     "actual": "合计 1,150，减半理由 ['以调解方式结案', '当事人申请撤诉']（只减一次，不叠加）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "未知案件类型 → 400",
+     "input": "POST /api/fee {case_type:\"刑事自诉\"}",
+     "expected": "400 不支持的案件类型",
+     "actual": "400 {\"detail\":\"不支持的案件类型\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "金额为 0：不出受理费项",
+     "input": "POST /api/fee {amount:0}",
+     "expected": "total=0，items 为空",
+     "actual": "total=0.0，items=[]",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "负数金额不炸",
+     "input": "POST /api/fee {amount:-50000}",
+     "expected": "total=0",
+     "actual": "total=0.0（负数被夹到 0）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "保全费封顶 5,000 元",
+     "input": "POST /api/fee {preserve:9999999}",
+     "expected": "保全申请费 = 5,000",
+     "actual": "保全 5,000（第14条上限 5,000）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "依据确实来自法条库（第13/14/20/29条，正文非空）",
+     "input": "POST /api/fee {amount:100000} → citations",
+     "expected": "≥4 条，含第十三条且有条文正文",
+     "actual": "4 条依据，首条《《诉讼费用交纳办法》 第十三条》第13条，正文 案件受理费分别按照下列标准交纳： (一)财产案件根据诉讼…",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "limit",
+   "title": "诉讼时效 / 仲裁时效",
+   "note": "依据民法典第 188~195、200~203、594 条，劳动争议调解仲裁法第 27 条，保险法第 26 条。期望届满日用 datetime 独立推算（按年=到期月对应日，无对应日落月末）。",
+   "api": "POST /api/limit",
+   "cases": [
+    {
+     "name": "普通时效 3 年已过",
+     "input": "POST /api/limit {\"start\": \"2022-03-15\", \"kind\": \"civil3\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2025-03-15，状态 expired",
+     "actual": "2025-03-15 / 已过时效(剩 -555 天)；对照复算 2025-03-15（剩 -555 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "普通时效 3 年未过",
+     "input": "POST /api/limit {\"start\": \"2024-06-01\", \"kind\": \"civil3\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2027-06-01，状态 ok",
+     "actual": "2027-06-01 / 尚在时效内(剩 253 天)；对照复算 2027-06-01（剩 253 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "起算日为 2/29（3 年后无对应日）",
+     "input": "POST /api/limit {\"start\": \"2024-02-29\", \"kind\": \"civil3\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2027-02-28，状态 ok",
+     "actual": "2027-02-28 / 尚在时效内(剩 160 天)；对照复算 2027-02-28（剩 160 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "劳动仲裁 1 年",
+     "input": "POST /api/limit {\"start\": \"2025-11-01\", \"kind\": \"labor1\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2026-11-01，状态 ok",
+     "actual": "2026-11-01 / 尚在时效内(剩 41 天)；对照复算 2026-11-01（剩 41 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "中断后自中断日重新算 1 年",
+     "input": "POST /api/limit {\"start\": \"2023-06-01\", \"kind\": \"labor1\", \"interrupt\": \"2024-05-20\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2025-05-20，状态 expired",
+     "actual": "2025-05-20 / 已过时效(剩 -489 天)；对照复算 2025-05-20（剩 -489 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "中止：消除之日起满 6 个月",
+     "input": "POST /api/limit {\"start\": \"2023-06-01\", \"kind\": \"civil3\", \"suspension_end\": \"2026-08-01\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2027-02-01，状态 ok",
+     "actual": "2027-02-01 / 尚在时效内(剩 133 天)；对照复算 2027-02-01（剩 133 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "保险金请求权 2 年",
+     "input": "POST /api/limit {\"start\": \"2025-01-31\", \"kind\": \"insurance2\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2027-01-31，状态 ok",
+     "actual": "2027-01-31 / 尚在时效内(剩 132 天)；对照复算 2027-01-31（剩 132 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "人寿保险 5 年，剩 4 天 → 即将届满",
+     "input": "POST /api/limit {\"start\": \"2021-09-25\", \"kind\": \"life5\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2026-09-25，状态 soon",
+     "actual": "2026-09-25 / 30 日内届满(剩 4 天)；对照复算 2026-09-25（剩 4 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "国际货物买卖 4 年",
+     "input": "POST /api/limit {\"start\": \"2022-12-31\", \"kind\": \"intl4\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2026-12-31，状态 ok",
+     "actual": "2026-12-31 / 尚在时效内(剩 101 天)；对照复算 2026-12-31（剩 101 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "最长保护期 20 年",
+     "input": "POST /api/limit {\"start\": \"2007-05-10\", \"kind\": \"max20\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2027-05-10，状态 ok",
+     "actual": "2027-05-10 / 尚在时效内(剩 231 天)；对照复算 2027-05-10（剩 231 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "届满当天（剩 0 天）算未过但提示临近",
+     "input": "POST /api/limit {\"start\": \"2023-09-21\", \"kind\": \"civil3\", \"today\": \"2026-09-21\"}",
+     "expected": "届满 2026-09-21，状态 soon",
+     "actual": "2026-09-21 / 30 日内届满(剩 0 天)；对照复算 2026-09-21（剩 0 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "自定义 15 日",
+     "input": "POST /api/limit {\"start\": \"2026-09-20\", \"kind\": \"civil3\", \"days\": 15, \"today\": \"2026-09-21\"}",
+     "expected": "届满 2026-10-05，状态 soon",
+     "actual": "2026-10-05 / 30 日内届满(剩 14 天)；对照复算 2026-10-05（剩 14 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "自定义 1 个月（1/31 → 2/28）",
+     "input": "POST /api/limit {\"start\": \"2026-01-31\", \"kind\": \"civil3\", \"months\": 1, \"today\": \"2026-09-21\"}",
+     "expected": "届满 2026-02-28，状态 expired",
+     "actual": "2026-02-28 / 已过时效(剩 -205 天)；对照复算 2026-02-28（剩 -205 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "自定义 2 年",
+     "input": "POST /api/limit {\"start\": \"2025-03-01\", \"kind\": \"civil3\", \"years\": 2, \"today\": \"2026-09-21\"}",
+     "expected": "届满 2027-03-01，状态 ok",
+     "actual": "2027-03-01 / 尚在时效内(剩 161 天)；对照复算 2027-03-01（剩 161 天）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "中断 + 中止同时存在：两条提示都给出",
+     "input": "POST /api/limit {start:2023-01-10, interrupt:2025-07-01, suspension_end:2026-03-31}",
+     "expected": "shifted 两条（第195条重算 / 第194条满6个月）",
+     "actual": "届满 2028-07-01；提示 ['发生时效中断（2025-07-01），自该日起重新计算（第195条）', '存在时效中止（中止原因消除日 2026-03-31），自消除之日起满 6 个月才届满（第194条）']",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "依据带民法典第188条等原文、且不重复",
+     "input": "POST /api/limit {start:2024-01-01, kind:civil3}",
+     "expected": "≥5 条、正文非空、含第188条、条号不重复",
+     "actual": "5 条依据，民法典条号 [188, 192, 193, 195, 202]，正文最短 18 字",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "非法输入：起算日为空",
+     "input": "POST /api/limit {\"start\": \"\", \"kind\": \"civil3\"}",
+     "expected": "400 请填写起算日期",
+     "actual": "400 {\"detail\":\"请填写起算日期，格式 2024-03-15\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "非法输入：乱写日期",
+     "input": "POST /api/limit {\"start\": \"不对\", \"kind\": \"civil3\"}",
+     "expected": "400",
+     "actual": "400 {\"detail\":\"请填写起算日期，格式 2024-03-15\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "非法输入：未知时效类型 + 无自定义期间",
+     "input": "POST /api/limit {\"start\": \"2024-01-01\", \"kind\": \"xyz\"}",
+     "expected": "400 请选择时效类型",
+     "actual": "400 {\"detail\":\"请选择时效类型或填写自定义期间\"}",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "share",
+   "title": "计算器结果分享长图",
+   "note": "后端用 Pillow 直接把 /api/fee、/api/limit 的结果画成 750 宽长图，数值由后端重算，前端只传输入条件；量化到 128 色控制体积。",
+   "api": "POST /api/share/{fee,limit}",
+   "cases": [
+    {
+     "name": "诉讼费分享图：750 宽长图",
+     "input": "POST /api/share/fee {\"case_type\": \"property\", \"amount\": 100000, \"preserve\": 50000, \"simple\": true}",
+     "expected": "200 image/png、魔数正确、宽 750、高 1200~4000",
+     "actual": "750x2296",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "图片体积在合理区间（别把手机相册撑爆）",
+     "input": "同上",
+     "expected": "20KB ~ 400KB",
+     "actual": "94 KB（量化到 128 色）",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "同一份输入两次出图完全一致",
+     "input": "连续 POST 两次同样 body",
+     "expected": "字节相同（图里只有日期没有时分秒）",
+     "actual": "两次字节一致（96525 vs 96525）",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "图由后端重算：换标的额出图不同",
+     "input": "amount 10 万 vs 100 万",
+     "expected": "两张图字节不同",
+     "actual": "标的额改了图就变（96525 vs 107476 字节）",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "时效分享图：劳动仲裁 1 年",
+     "input": "POST /api/share/limit {kind:labor1, start:2025-10-01}",
+     "expected": "200 image/png、750 宽",
+     "actual": "750x1754",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "未登录不出图",
+     "input": "POST /api/share/fee（无 Authorization）",
+     "expected": "401",
+     "actual": "401",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "非法输入：未知案件类型",
+     "input": "POST /api/share/fee {\"case_type\": \"xyz\", \"amount\": 1000}",
+     "expected": "400 + 中文说明",
+     "actual": "400 {\"detail\":\"不支持的案件类型\"}",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "非法输入：未知时效类型",
+     "input": "POST /api/share/limit {\"kind\": \"xyz\", \"start\": \"2024-01-01\"}",
+     "expected": "400 + 中文说明",
+     "actual": "400 {\"detail\":\"请选择时效类型或填写自定义期间\"}",
+     "ok": true,
+     "prio": "P2"
+    }
+   ]
+  },
+  {
+   "id": "elements",
+   "title": "案情要素结构化引导",
+   "note": "纯规则抽取，不调模型：8 个领域 × 5~6 个要素，抽到就填、没抽到就追问。",
+   "api": "POST /api/elements",
+   "cases": [
+    {
+     "name": "劳动：辞退 + 月薪 + 年限 + 未签合同",
+     "input": "POST /api/elements question=「公司把我辞退了，我月薪8000，干了3年没签劳动合同，有工资流水和聊…」",
+     "expected": "domain=labor；月工资=8000元、工作时长=3年、书面劳动合同=没有",
+     "actual": "domain=labor（劳动工伤），filled={'月工资': '8000元', '工作时长': '3年', '书面劳动合同': '没有', '解除/争议原因': '辞退', '已有证据': '工资流水、聊天记录'}，missing=1 项，show=True，score=0.83",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "借贷：本金 + 借条 + 利息 + 还款日",
+     "input": "POST /api/elements question=「朋友2023年5月1日找我借了12万块钱，写了借条，约定月息2分，说…」",
+     "expected": "domain=loan；欠款本金=120000元、有没有借条=有、约定利息=月息",
+     "actual": "domain=loan（欠薪讨债），filled={'欠款本金': '120000元', '有没有借条': '有', '约定利息': '月息', '还款期限': '2023年5月1日'}，missing=1 项，show=True，score=0.8",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "交通事故：全责 + 骨折 + 交强险 + 已花费用",
+     "input": "POST /api/elements question=「我开车被追尾，对方全责，我骨折住院花了48000元，对方有交强险和商…」",
+     "expected": "domain=traffic；责任认定=全责、伤情/损失=骨折、已花费用=48000元",
+     "actual": "domain=traffic（交通事故），filled={'责任认定': '全责', '伤情/损失': '骨折', '保险情况': '交强险', '已花费用': '48000元'}，missing=1 项，show=True，score=0.8",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "消费：网购假货 + 金额 + 渠道",
+     "input": "POST /api/elements question=「我在抖音直播间买到假货香水，花了1899元，有订单和支付记录，商家拒…」",
+     "expected": "domain=shop；支付金额=1899元、购买渠道=抖音、问题类型=假货",
+     "actual": "domain=shop（消费维权），filled={'支付金额': '1899元', '问题类型': '假货', '购买渠道': '抖音', '已有凭证': '订单、支付记录'}，missing=1 项，show=True，score=0.8",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "刑事：涉案金额 + 行为",
+     "input": "POST /api/elements question=「我弟弟涉嫌盗窃被抓了，涉案金额23000元，现在在检察院阶段，家里想…」",
+     "expected": "domain=crime；涉案金额=23000元、涉案行为=盗窃",
+     "actual": "domain=crime（刑事治安），filled={'涉案行为': '盗窃', '涉案金额': '23000元', '从轻情节': '退赃、谅解'}，missing=2 项，show=True，score=0.6",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "房产：房东不退押金",
+     "input": "POST /api/elements question=「我是租客，房子到期了房东以墙面脏为由不退我押金5000，合同里没写这…」",
+     "expected": "domain=house；涉及金额=5000元",
+     "actual": "domain=house（房产物业），filled={'你的身份': '租客', '涉及金额': '5000元', '有没有书面合同': '有'}，missing=2 项，show=True，score=0.6",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "纯法条提问不做案情引导（不该反问「你月薪多少」）",
+     "input": "POST /api/elements question=\"试用期最长可以约定几个月？\"",
+     "expected": "show=false",
+     "actual": "试用期最长可以约定几…→show=False domain=labor；诉讼时效是几年？…→show=False domain=generic",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "兜底领域：识别不出时给通用要素",
+     "input": "POST /api/elements question=\"邻居家的树长过界了怎么办\"",
+     "expected": "domain=generic 且有 missing",
+     "actual": "domain=generic（一般咨询），missing=['涉及金额', '发生时间', '已有证据', '你的诉求']",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "缺项必须自带追问文案（前端直接渲染）",
+     "input": "POST /api/elements question=\"公司辞退我，有工资流水\"",
+     "expected": "含「月工资」且每条都有 ask",
+     "actual": "missing=['月工资', '工作时长', '书面劳动合同', '你的诉求']；每条都带 ask 文案=True",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "followup",
+   "title": "追问建议",
+   "note": "本地模型现生成（12s 超时）→ 不合规格退回领域题库，保证界面这块不空。",
+   "api": "POST /api/followups",
+   "cases": [
+    {
+     "name": "劳动：违法解除",
+     "input": "POST /api/followups question=「公司把我辞退了，我月薪8000，干了3年没签…」",
+     "expected": "3 条问句，domain=labor",
+     "actual": "source=template domain=labor 2771ms；['违法解除的赔偿金具体怎么算？', '申请劳动仲裁去哪儿交、多久立案？', '公司不给开离职证明怎么办？']",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "借贷：欠条过期",
+     "input": "POST /api/followups question=「朋友借我12万，借条写的去年还，现在联系不上…」",
+     "expected": "3 条问句，domain=loan",
+     "actual": "source=model domain=loan 8327ms；['那时效过了还能起诉吗？具体怎么算的？', '找不到人怎么办，起诉状寄到哪里？', '诉讼费用大概多少，我能承担得起吗？']",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "消费：假货",
+     "input": "POST /api/followups question=「我在网上买到假货香水，商家拒绝退货…」",
+     "expected": "3 条问句，domain=shop",
+     "actual": "source=model domain=shop 1320ms；['我保留好聊天记录和订单截图，具体怎么操作？', '平台投诉入口在哪里，多久有结果？', '如果金额小还要走法律程序吗？']",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "空问题 → 400",
+     "input": "POST /api/followups {question:\"   \"}",
+     "expected": "400 缺少问题",
+     "actual": "400 {\"detail\":\"缺少问题\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "只给问题不给回答也能出建议",
+     "input": "POST /api/followups question=\"我开车被追尾，对方全责我骨折住院了\"",
+     "expected": "3 条 + domain=traffic",
+     "actual": "source=model，items=['住院期间医院开的费用票据能全部报销吗？', '误工费需要哪些证明材料？', '事故认定书不服怎么复核？']",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "contract",
+   "title": "合同审查",
+   "note": "20 条规则命中 + 每条挂 laws.db 真实条文作依据；模型只补一段总体评价，不参与命中判断。",
+   "api": "POST /api/contract/review",
+   "cases": [
+    {
+     "name": "租房合同（8 处以上问题）",
+     "input": "POST /api/contract/review text=「房屋租赁合同…」polish=false",
+     "expected": "命中含「违约金、免责、格式条款、自动续期、二十年、订金、送达、单方」，每条都有依据",
+     "actual": "11 个条款 → 12 项（高4/中7/低1），等级降序=True，全部带法条依据=True，预期风险点全部命中",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "借款合同（高息 + 空白 + 无争议条款）",
+     "input": "POST /api/contract/review text=「借款协议…」polish=false",
+     "expected": "命中含「利率、格式条款、空白、争议」，每条都有依据",
+     "actual": "9 个条款 → 7 项（高5/中1/低1），等级降序=True，全部带法条依据=True，预期风险点全部命中",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "劳动合同（试用期超长 + 竞业无补偿）",
+     "input": "POST /api/contract/review text=「劳动合同书…」polish=false",
+     "expected": "命中含「试用期、竞业限制」，每条都有依据",
+     "actual": "8 个条款 → 6 项（高3/中3/低0），等级降序=True，全部带法条依据=True，预期风险点全部命中",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "消费单据（不退不换 + 金额留白）",
+     "input": "POST /api/contract/review text=「购机确认单…」polish=false",
+     "expected": "命中含「消费者、免责、空白」，每条都有依据",
+     "actual": "4 个条款 → 8 项（高4/中3/低1），等级降序=True，全部带法条依据=True，预期风险点全部命中",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "干净合同不误报高风险（阴性对照）",
+     "input": "POST /api/contract/review text=验收合格的软件服务合同",
+     "expected": "≤2 项且无「高」级",
+     "actual": "0 项，等级=[]，=[]",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "每条风险定位到具体条款 + 原文摘录（全文级规则只标「全文」）",
+     "input": "POST /api/contract/review text=租房合同",
+     "expected": "where 非空；条款级 excerpt 非空",
+     "actual": "12 项都标了指向条款；缺原文摘录=无；示例：第五条「第五条 乙方提前退租的，违约金为剩余租金的5…」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "依据条文真实取自 laws.db（含民法典第705条）",
+     "input": "POST /api/contract/review text=租房合同 → basis",
+     "expected": "非空、正文齐全、含第705条",
+     "actual": "21 个依据点、去重后 19 条法条，正文缺失 0 条；租赁超20年引到民法典第705条=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "开 polish 时模型补一段总体评价（不改命中结果）",
+     "input": "POST /api/contract/review {polish:true}",
+     "expected": "model_note ≥12 字",
+     "actual": "3.3s，总体评价 173 字：结论：能签但必须改三条：第三条单方调价权是致命条款，属于排除乙方主要权利的格式条款，直接删除并改为书面通知后 3…",
+     "ok": true,
+     "prio": "P1"
+    },
+    {
+     "name": "文本过短 → 400",
+     "input": "POST /api/contract/review {text:\"太短\"}",
+     "expected": "400",
+     "actual": "400 {\"detail\":\"请把合同正文粘贴进来（至少 20 字）\"}",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "upload",
+   "title": "合同文件上传与正文抽取",
+   "note": "从微信聊天里选 .txt/.docx 传上来：docx 用标准库 zipfile 解 word/document.xml（不引 python-docx），txt 依次试 utf-8-sig / gb18030 / big5。接口只回正文字符串，服务端不留文件。",
+   "api": "POST /api/contract/extract",
+   "cases": [
+    {
+     "name": "上传 docx：解出的正文与合同原文逐字一致",
+     "input": "POST /api/contract/extract file=租房合同.docx（脚本内 zipfile 现造）",
+     "expected": "200 + text 与 LEASE 相同（忽略换行/缩进）",
+     "actual": "docx 992 字节 → 200，正文 297 字（原文 297 字），折空白后与合同原文一致=True，首行「房屋租赁合同」",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "txt 认 UTF-8 也认 GBK",
+     "input": "同一份正文按两种编码各传一次",
+     "expected": "解出内容相同",
+     "actual": "utf-8 297 字 / GBK 297 字，两份都和原文一致=True（Windows 上另存的 txt 多是 GBK，不能只认 utf-8）",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "Word 把一句拆成多个 run 也不掉字",
+     "input": "docx 里同一句分三段 <w:r><w:t>",
+     "expected": "解出与原句完全相等",
+     "actual": "一句话拆成 3 个 w:r 后解出 34 字，拼回整句=True；「第五条 乙方逾期支付租金的，每逾期一日按月租金的千分…」",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "超过 2 万字的长合同按上限截断并告知",
+     "input": "POST /api/contract/extract 44 字 × 500 行",
+     "expected": "chars=全文长度、text 长 20000、truncated=true",
+     "actual": "21000 字 → 返回 20000 字，truncated=True，截断位与 textarea 的 maxlength 一致=True",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "不支持/坏掉的输入全部 400 且说人话",
+     "input": "空文件、zip 头假 docx、.doc、.pdf、.wps、无后缀各传一次",
+     "expected": "6 种都 400 + 中文提示",
+     "actual": "空白文件→400「文件是空的」；假 docx（只是 zip 头）→400「这份 .docx 打不开（不是有」；老版 .doc→400「老版 .doc 是二进制格式解析」；PDF→400「暂不解析 PDF（扫描件还要 O」；WPS→400「WPS 的 .wps 读不了，请」；没后缀→400「不支持 .无后缀，目前只吃 .t」",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "超过 2 MB 直接拒收（别把手机和后端一起撑爆）",
+     "input": "POST /api/contract/extract 2 MB + 1 字节",
+     "expected": "400 + 提示上限",
+     "actual": "2048 KB → 400「文件 2048 KB，超过 2 MB 上限；请删掉附图或分段上传」",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "抽出的正文直接能审查，命中与粘贴文本完全相同",
+     "input": "extract → 同一段 LEASE 分别走上传与粘贴，比对 POST /api/contract/review",
+     "expected": "命中风险标题集合相同",
+     "actual": "上传版命中 12 项、粘贴版 12 项，标题集合一致=True；前 3 项：付款节点先于交付/验收、免责条款可能整体无效、写的是「订金/意向金」，没有定金罚则",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "未登录不能传文件",
+     "input": "POST /api/contract/extract 不带 token",
+     "expected": "401",
+     "actual": "401",
+     "ok": true,
+     "prio": "P2"
+    }
+   ]
+  },
+  {
+   "id": "document",
+   "title": "文书生成",
+   "note": "起诉状 / 仲裁申请书 / 催告函三种，纯模板拼装 + 必填校验，模型只做可选润色。",
+   "api": "GET /api/document/spec, POST /api/document/generate",
+   "cases": [
+    {
+     "name": "民事起诉状：要素齐全 + 段落顺序正确",
+     "input": "POST /api/document/generate kind=complaint（借贷，2 项诉请）",
+     "expected": "标题→原告→被告→诉讼请求→事实与理由→此致→法院→具状人→日期 依次出现",
+     "actual": "487 字；缺失=无；段落顺序=True",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "仲裁申请书：抬头/委/请求都换成仲裁口径",
+     "input": "POST /api/document/generate kind=arbitration（劳动争议）",
+     "expected": "标题=劳动人事争议仲裁申请书、申请人/被申请人、仲裁请求、受理委",
+     "actual": "446 字；缺失=无",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "催告函：宽限期默认 7 日 + 时效中断提示",
+     "input": "POST /api/document/generate kind=demand（不填 days）",
+     "expected": "「7 日内」+「诉讼时效自本函送达之日起中断」+ 致/发函人",
+     "actual": "307 字；缺失=无",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "标题出现在正文首行（复制全文带抬头）",
+     "input": "三种文书的 body 首行 vs title",
+     "expected": "首行 == title",
+     "actual": "complaint→「民事起诉状」；arbitration→「劳动人事争议仲裁申请书」；demand→「催告函」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "缺必填字段 → 400 并点名缺哪项",
+     "input": "POST /api/document/generate（删掉 court / plaintiff）",
+     "expected": "400 且提示「受诉法院」「原告信息」",
+     "actual": "400 {\"detail\":\"请先填写：受诉法院\"} / {\"detail\":\"请先填写：原告信息\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "劳动争议直接写起诉状 → 拦住并指引先仲裁",
+     "input": "POST /api/document/generate kind=complaint cause=劳动争议纠纷",
+     "expected": "400 且提示仲裁前置",
+     "actual": "400 {\"detail\":\"劳动争议要先申请劳动仲裁，不能直接起诉。请改用「劳动人事争议仲裁申请书」。\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "未知文书类型 → 400",
+     "input": "POST /api/document/generate {kind:\"判决书\"}",
+     "expected": "400",
+     "actual": "400 {\"detail\":\"不支持的文书类型：判决书\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "起诉状带办理提示与法条依据",
+     "input": "POST /api/document/generate kind=complaint",
+     "expected": "notes≥2 且 citations 正文非空",
+     "actual": "3 条提示（首条：立案需要：起诉状按被告人数提交副本、原告身份证明、证据清单及…），4 条法条依据（《中华人民共和国民法典》合同编 第五百七十七条、《中华人民共和国民法典》合同编 第五百七十九条、《中华人民共和国民事诉讼法》 第一百二十二条）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "多被告时副本份数有交代",
+     "input": "POST /api/document/generate（两个被告）",
+     "expected": "正文出现副本份数",
+     "actual": "含副本份数说明：['附：1. 本状副本2份；2. 证据材料2项（详见证据清单）。']",
+     "ok": true,
+     "prio": "P0"
+    }
+   ]
+  },
+  {
+   "id": "chat",
+   "title": "咨询主链路与会话",
+   "note": "意图分流 + 法条 FTS + 类案向量并行检索 → legal 模型真流式生成；同时校验 SSE 事件顺序、整包兜底、多轮上下文与会话增删改。",
+   "api": "POST /api/chat, /api/chat_once, /api/sessions*",
+   "cases": [
+    {
+     "name": "法条类提问：chat_once 出答案 + 法条引用",
+     "input": "POST /api/chat_once {question:\"试用期最长可以约定几个月？\"}",
+     "expected": "200、答案>40字、引用含 kind=law、无 &lt;think&gt; 残留",
+     "actual": "14.4s，intent=legal，答案 389 字，引用 10 条（法条 6 / 类案 4）；开头「结论：最长不超过 6 个月，具体上限取决于合同期限（《劳动合同法》第…」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "流式 /api/chat：SSE 事件顺序与增量重组",
+     "input": "POST /api/chat（流式，被辞退赔偿问题）",
+     "expected": "meta→status→delta…→done，delta 拼起来是完整答案",
+     "actual": "21.4s，事件序 meta→status→delta→…delta×205→done，intent=legal，重组 326 字，done 带 10 条引用",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "流式结果正确落库（一问一答各 1 条，不重复插）",
+     "input": "GET /api/sessions/{sid}/messages",
+     "expected": "2 条消息、citations 已存",
+     "actual": "2 条消息（1 user + 1 assistant），assistant 326 字，intent=legal，落库引用 10 条",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "多轮：带 session_id 追问，历史被读进上下文",
+     "input": "POST /api/chat_once {question:'那这个赔偿要不要先交仲裁费？', session_id}",
+     "expected": "会话累计 4 条消息",
+     "actual": "追问后 4 条消息（应为 4），回答 274 字；开头「结论：要。劳动争议仲裁实行收费制（第 4 条、第 76 条）…」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "闲聊不走 RAG（不检法条、不装样子）",
+     "input": "POST /api/chat_once {question:\"你好呀，你是谁做的？\"}",
+     "expected": "intent 非 legal 且 citations 为空",
+     "actual": "intent=chat，引用 0 条，回答「我是「法律助手」小程序内置的中文法律咨询助理，由阿里巴巴云和大模型技术团队提供技…」",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "会话改名 / 列表 / 删除（消息一起清）",
+     "input": "POST /api/chat_once → PATCH/GET/DELETE /api/sessions/{sid}",
+     "expected": "全部 ok，删后 404",
+     "actual": "改名 ok=True，列表命中 1 条，删除 ok=True，删后列表 0 条、详情 404",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "取不存在/别人的会话 → 404（不泄露内容）",
+     "input": "GET /api/sessions/<随机 uuid>/messages",
+     "expected": "404",
+     "actual": "404 {\"detail\":\"会话不存在\"}",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "点赞反馈能落库",
+     "input": "POST /api/feedback {message_id, rating:1}",
+     "expected": "ok=true",
+     "actual": "message_id=368，POST /api/feedback → {'ok': True}",
+     "ok": true,
+     "prio": "P1"
+    }
+   ]
+  },
+  {
+   "id": "build",
+   "title": "小程序产物检查",
+   "note": "跑批时读的是 dist/build/mp-weixin 真实产物（不是 src），确认改动真的进了包。",
+   "api": "",
+   "cases": [
+    {
+     "name": "pages.json：4 个 tab + 5 个新页面都注册了",
+     "input": "dist/build/mp-weixin/app.json",
+     "expected": "tabBar 4 项、10 页齐全",
+     "actual": "10 页 / 4 tab=['pages/index/index', 'pages/laws/laws', 'pages/tools/tools', 'pages/history/history']；缺页=无",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "新页面/组件产物存在",
+     "input": "dist 目录",
+     "expected": "8 个文件都在",
+     "actual": "8/8 存在；缺=无",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "产物里的构建标记（确认加载的是新包）",
+     "input": "dist/utils/api.js",
+     "expected": "含 [mp-build] 标记与 chat_once/onChunkReceived",
+     "actual": "标记「P2-3 带去咨询+分享长图+合同上传 2026-09-22a」，关键符号缺=无",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "跨页共用的徽标/卡片样式在全局（小程序组件样式不外泄）",
+     "input": "dist/app.wxss",
+     "expected": "--radius/--primary/box-sizing/.chip-law/.chip-case/.card 均在全局",
+     "actual": "app.wxss 1176 字节，缺=无（vars.css 已并入全局，跨页可取）",
+     "ok": true,
+     "prio": "P1"
+    },
+    {
+     "name": "全仓无 v-html",
+     "input": "dist 全量扫描",
+     "expected": "0 处",
+     "actual": "v-html 出现于 无（小程序不支持，必须用 view/text 拼）",
+     "ok": true,
+     "prio": "P1"
+    },
+    {
+     "name": "P2-1/P2-2：结果页的「去咨询」与「保存分享图」都在包里",
+     "input": "dist/pages/*.wxml + utils/{ask,api}.js + index.js + app.wxss",
+     "expected": "按钮、接口调用、相册保存、全局样式齐备",
+     "actual": "4 页去咨询按钮 + 2 页分享图按钮 + ask.js 写入 + 首页读取 + 全局样式，缺=无",
+     "ok": true,
+     "prio": "P2"
+    },
+    {
+     "name": "P2-3：合同上传的选文件、上传调用与提示都在包里",
+     "input": "dist/pages/contract/* + utils/api.js",
+     "expected": "入口、chooseMessageFile、extract、提示齐备",
+     "actual": "wxml 2 处 + js 4 处 + api 2 处检查，缺=无",
+     "ok": true,
+     "prio": "P2"
+    }
+   ]
+  },
+  {
+   "id": "mp",
+   "title": "小程序前端回归（收流 6 形态 + 带去咨询摘要）",
+   "note": "test_watchdog.mjs 加载 dist 真实产物 + 打真后端，逐形态验证：模拟器吞回调走整包兜底、安卓三种 chunk 形态、空 body 转 chat_once、真机无回调 25s 看门狗；test_ask.mjs stub 掉 uni 跑 utils/ask.js 的真实拼接逻辑。",
+   "api": "",
+   "cases": [
+    {
+     "name": "模拟器吞掉全部回调 → 直接 chat_once",
+     "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"devtools\", \"SWALLOW\": \"1\"}",
+     "expected": "整包出答案、0 次流式请求",
+     "actual": "exit=0；platform: devtools | 耗时: 13.8s ／ 流式请求数: 0 | chat_once 请求数: 1 ／ 事件序列: meta, delta:293, done；PASS: 模拟器识别为 devtools，直接整包出答案（293 字）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "真机逐块流式（message.data 形态）",
+     "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"SHAPE\": \"message\"}",
+     "expected": "逐字到达，answer 完整",
+     "actual": "exit=0；platform: android | 耗时: 32.0s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:2, delta:1, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:3, delta:1, delta:1, delta:2, delta:2, delta:1…（截断）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "真机安卓 chunk.data 形态",
+     "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"SHAPE\": \"data\"}",
+     "expected": "同上（白块 bug 的回归位）",
+     "actual": "exit=0；platform: android | 耗时: 33.6s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:3, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:3, delta:1, delta:1, delta:2, delta:1, delta:2, delta:2, delta:1, delta:2, delta:2, delta:1, delta:1, delta:3, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:1, delta:1, delta:1…（截断）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "真机回调直接给裸 buffer",
+     "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"SHAPE\": \"raw\"}",
+     "expected": "同上",
+     "actual": "exit=0；platform: android | 耗时: 33.0s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:2, delta:2, delta:3, delta:1, delta:1, delta:1, delta:2, delta:2, delta:1, delta:2, delta:2, delta:3, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:3…（截断）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "无可用 chunk + success 空串 → 转 chat_once",
+     "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"EMPTYSTR\": \"1\"}",
+     "expected": "不出现空白气泡",
+     "actual": "exit=0；platform: android | 耗时: 29.6s ／ 流式请求数: 1 | chat_once 请求数: 1 ／ 事件序列: meta, delta:284, done；PASS: 真机无可用 chunk + 空 body(空串)，已转 chat_once 补出答案（284 字）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "真机 0 回调 → 25s 看门狗",
+     "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"1\"}",
+     "expected": "看门狗触发 chat_once 补答",
+     "actual": "exit=0；platform: android | 耗时: 38.2s ／ 流式请求数: 1 | chat_once 请求数: 1 ／ 事件序列: meta, delta:294, done；PASS: 真机无回调时看门狗接管并整包出答案（294 字）",
+     "ok": true,
+     "prio": "P0"
+    },
+    {
+     "name": "「带去咨询」摘要拼接与截断（src 真实逻辑）",
+     "input": "node test_ask.mjs",
+     "expected": "5 条断言全 PASS：空项过滤 / switchTab / 砍到 560 字内 / 保留标题与问句 / 无事实只剩问句",
+     "actual": "exit=0；PASS 5 条断言全部通过",
+     "ok": true,
+     "prio": "P2"
+    }
+   ]
+  }
+ ],
+ "summary": {
+  "total": 139,
+  "passed": 139,
+  "failed": 0,
+  "groups": 13
+ }
+}
