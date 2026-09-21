@@ -1193,6 +1193,17 @@ def run_build():
     case("build", "产物里的构建标记（确认加载的是新包）", "dist/utils/api.js",
          "含 [mp-build] 标记与 chat_once/onChunkReceived", marker)
 
+    def auth_retry():
+        with open(os.path.join(dist, "utils", "api.js"), encoding="utf-8") as f:
+            s = f.read()
+        sites = s.count("401!==")  # 压缩后函数名会被重写，只能按分支特征数个数
+        cleared = "removeStorageSync" in s
+        return (sites >= 4 and cleared,
+                "401 分支 %d 处（普通请求/分享图/文件上传/整包兜底各一处），token 清理=%s"
+                % (sites, "有" if cleared else "无"))
+    case("build", "401 自愈的四个入口都真的进了包", "dist/utils/api.js",
+         "4 处 401 分支 + removeStorageSync 清缓存", auth_retry, "P2")
+
     def global_style():
         with open(os.path.join(dist, "app.wxss"), encoding="utf-8") as f:
             blob = f.read()
@@ -1276,7 +1287,8 @@ def run_mp():
     group("mp", "小程序前端回归（收流 6 形态 + 带去咨询摘要）",
          "test_watchdog.mjs 加载 dist 真实产物 + 打真后端，逐形态验证：模拟器吞回调走整包兜底、"
          "安卓三种 chunk 形态、空 body 转 chat_once、真机无回调 25s 看门狗；"
-         "test_ask.mjs stub 掉 uni 跑 utils/ask.js 的真实拼接逻辑。")
+         "test_ask.mjs stub 掉 uni 跑 utils/ask.js 的真实拼接逻辑；"
+         "test_relogin.mjs stub 掉 uni 跑 utils/api.js 的 401 静默重登与重放（含并发合并）。")
     modes = [
         ("模拟器吞掉全部回调 → 直接 chat_once", {"PLATFORM": "devtools", "SWALLOW": "1"}, "整包出答案、0 次流式请求"),
         ("真机逐块流式（message.data 形态）", {"PLATFORM": "android", "SWALLOW": "0", "SHAPE": "message"}, "逐字到达，answer 完整"),
@@ -1312,6 +1324,19 @@ def run_mp():
     case("mp", "「带去咨询」摘要拼接与截断（src 真实逻辑）", "node test_ask.mjs",
          "5 条断言全 PASS：空项过滤 / switchTab / 砍到 560 字内 / 保留标题与问句 / 无事实只剩问句",
          ask_js, "P2")
+
+    def relogin_js():
+        p = subprocess.run(["node", "test_relogin.mjs"], cwd=os.path.join(ROOT, "miniprogram"),
+                           capture_output=True, text=True, timeout=120,
+                           encoding="utf-8", errors="replace")
+        out = ((p.stdout or "") + (p.stderr or "")).strip()
+        tail = [l.strip() for l in out.splitlines() if l.startswith(("PASS", "FAIL"))]
+        ok = p.returncode == 0 and bool(tail) and tail[-1].startswith("PASS")
+        return (ok, f"exit={p.returncode}；" + (tail[-1] if tail else "脚本无输出"))
+    case("mp", "401 静默重登与重放（src 真实逻辑）", "node test_relogin.mjs",
+         "12 条断言全 PASS：重登一次并原样重放 / 旧 token 清出 storage / 并发 401 合并成一次重登 / "
+         "第二次 401 不递归 / 500 不重登 / 分享图与上传两条路径各自自愈 / 整包兜底路径照常出答案",
+         relogin_js, "P2")
 
 
 def save():

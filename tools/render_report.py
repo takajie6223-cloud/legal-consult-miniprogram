@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -191,12 +192,18 @@ def to_pdf(path):
     if not os.path.exists(CHROME):
         print("找不到 Chrome：" + CHROME)
         return False
+    # 复用默认 profile 时，只要有别的 Chrome 实例在跑（截图脚本、扩展、常驻浏览器），
+    # headless 就会直接退出、一个字节都不写，所以单独开一个临时 profile。
+    profile = os.path.join(tempfile.gettempdir(), "chrome-report-profile")
+    before = os.path.getmtime(path) if os.path.exists(path) else 0
     cmd = [CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
+           f"--user-data-dir={profile}",
            "--no-pdf-header-footer", "--virtual-time-budget=10000",
            f"--print-to-pdf={path}", "file:///" + HTML.replace("\\", "/")]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
                        encoding="utf-8", errors="replace")
-    ok = os.path.exists(path) and os.path.getsize(path) > 20000
+    # 只判存在和大小会被上一轮的旧文件骗过，必须看 mtime 有没有往前走
+    ok = os.path.exists(path) and os.path.getmtime(path) > before
     if not ok:
         print(r.stdout[-800:], r.stderr[-800:])
     return ok

@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-22 00:34:57",
+ "generated_at": "2026-09-22 01:51:59",
  "base": "http://127.0.0.1:9100",
  "groups": [
   {
@@ -44,7 +44,7 @@
      "name": "接口响应时间（本地回环）",
      "input": "GET /api/health × 3",
      "expected": "< 500ms",
-     "actual": "3 次 ['1ms', '1ms', '1ms']",
+     "actual": "3 次 ['2ms', '2ms', '2ms']",
      "ok": true,
      "prio": "P1"
     }
@@ -748,7 +748,7 @@
      "name": "劳动：违法解除",
      "input": "POST /api/followups question=「公司把我辞退了，我月薪8000，干了3年没签…」",
      "expected": "3 条问句，domain=labor",
-     "actual": "source=template domain=labor 2771ms；['违法解除的赔偿金具体怎么算？', '申请劳动仲裁去哪儿交、多久立案？', '公司不给开离职证明怎么办？']",
+     "actual": "source=model domain=labor 6626ms；['那我主张的二倍工资差额和赔偿金的计算基数怎么算？', '违法解除的赔偿金具体怎么算？', '申请劳动仲裁去哪儿交、多久立案？']",
      "ok": true,
      "prio": "P0"
     },
@@ -756,7 +756,7 @@
      "name": "借贷：欠条过期",
      "input": "POST /api/followups question=「朋友借我12万，借条写的去年还，现在联系不上…」",
      "expected": "3 条问句，domain=loan",
-     "actual": "source=model domain=loan 8327ms；['那时效过了还能起诉吗？具体怎么算的？', '找不到人怎么办，起诉状寄到哪里？', '诉讼费用大概多少，我能承担得起吗？']",
+     "actual": "source=model domain=loan 1594ms；['诉讼时效过期了是不是就真拿不回钱了？对方一直不还还能起诉吗？', '只有微信聊天记录能起诉吗？', '利息约定超过多少法院不支持？']",
      "ok": true,
      "prio": "P0"
     },
@@ -764,7 +764,7 @@
      "name": "消费：假货",
      "input": "POST /api/followups question=「我在网上买到假货香水，商家拒绝退货…」",
      "expected": "3 条问句，domain=shop",
-     "actual": "source=model domain=shop 1320ms；['我保留好聊天记录和订单截图，具体怎么操作？', '平台投诉入口在哪里，多久有结果？', '如果金额小还要走法律程序吗？']",
+     "actual": "source=model domain=shop 2192ms；['那如果我不懂怎么取证，平台能帮我收集吗？', '三倍赔偿的判决书要多久下来？我能先申请调解吗？', '商家注销了怎么办，还能找到他们吗？']",
      "ok": true,
      "prio": "P0"
     },
@@ -780,7 +780,7 @@
      "name": "只给问题不给回答也能出建议",
      "input": "POST /api/followups question=\"我开车被追尾，对方全责我骨折住院了\"",
      "expected": "3 条 + domain=traffic",
-     "actual": "source=model，items=['住院期间医院开的费用票据能全部报销吗？', '误工费需要哪些证明材料？', '事故认定书不服怎么复核？']",
+     "actual": "source=template，items=['误工费需要哪些证明材料？', '事故认定书不服怎么复核？', '伤残等级什么时候做鉴定？']",
      "ok": true,
      "prio": "P0"
     }
@@ -852,7 +852,7 @@
      "name": "开 polish 时模型补一段总体评价（不改命中结果）",
      "input": "POST /api/contract/review {polish:true}",
      "expected": "model_note ≥12 字",
-     "actual": "3.3s，总体评价 173 字：结论：能签但必须改三条：第三条单方调价权是致命条款，属于排除乙方主要权利的格式条款，直接删除并改为书面通知后 3…",
+     "actual": "3.6s，总体评价 147 字：这份合同对承租方明显不利，三条硬伤：一次性付 25 年租金且甲方可随时调价，属于典型霸王条款，可主张无效；房屋设…",
      "ok": true,
      "prio": "P1"
     },
@@ -916,7 +916,7 @@
      "name": "超过 2 MB 直接拒收（别把手机和后端一起撑爆）",
      "input": "POST /api/contract/extract 2 MB + 1 字节",
      "expected": "400 + 提示上限",
-     "actual": "2048 KB → 400「文件 2048 KB，超过 2 MB 上限；请删掉附图或分段上传」",
+     "actual": "2048 KB → 400「文件 2049 KB，超过 2 MB 上限；请删掉附图或分段上传」",
      "ok": true,
      "prio": "P2"
     },
@@ -1028,7 +1028,7 @@
      "name": "法条类提问：chat_once 出答案 + 法条引用",
      "input": "POST /api/chat_once {question:\"试用期最长可以约定几个月？\"}",
      "expected": "200、答案>40字、引用含 kind=law、无 &lt;think&gt; 残留",
-     "actual": "14.4s，intent=legal，答案 389 字，引用 10 条（法条 6 / 类案 4）；开头「结论：最长不超过 6 个月，具体上限取决于合同期限（《劳动合同法》第…」",
+     "actual": "17.7s，intent=legal，答案 222 字，引用 10 条（法条 6 / 类案 4）；开头「结论：试用期上限取决于合同期限：3 个月以上不满 1 年的 ≤1 个…」",
      "ok": true,
      "prio": "P0"
     },
@@ -1036,7 +1036,7 @@
      "name": "流式 /api/chat：SSE 事件顺序与增量重组",
      "input": "POST /api/chat（流式，被辞退赔偿问题）",
      "expected": "meta→status→delta…→done，delta 拼起来是完整答案",
-     "actual": "21.4s，事件序 meta→status→delta→…delta×205→done，intent=legal，重组 326 字，done 带 10 条引用",
+     "actual": "26.2s，事件序 meta→status→delta→…delta×416→done，intent=legal，重组 713 字，done 带 10 条引用",
      "ok": true,
      "prio": "P0"
     },
@@ -1044,7 +1044,7 @@
      "name": "流式结果正确落库（一问一答各 1 条，不重复插）",
      "input": "GET /api/sessions/{sid}/messages",
      "expected": "2 条消息、citations 已存",
-     "actual": "2 条消息（1 user + 1 assistant），assistant 326 字，intent=legal，落库引用 10 条",
+     "actual": "2 条消息（1 user + 1 assistant），assistant 713 字，intent=legal，落库引用 10 条",
      "ok": true,
      "prio": "P0"
     },
@@ -1052,7 +1052,7 @@
      "name": "多轮：带 session_id 追问，历史被读进上下文",
      "input": "POST /api/chat_once {question:'那这个赔偿要不要先交仲裁费？', session_id}",
      "expected": "会话累计 4 条消息",
-     "actual": "追问后 4 条消息（应为 4），回答 274 字；开头「结论：要。劳动争议仲裁实行收费制（第 4 条、第 76 条）…」",
+     "actual": "追问后 4 条消息（应为 4），回答 413 字；开头「结论：要交。仲裁立案前需预交案件受理费（申请费），不交的案子…」",
      "ok": true,
      "prio": "P0"
     },
@@ -1060,7 +1060,7 @@
      "name": "闲聊不走 RAG（不检法条、不装样子）",
      "input": "POST /api/chat_once {question:\"你好呀，你是谁做的？\"}",
      "expected": "intent 非 legal 且 citations 为空",
-     "actual": "intent=chat，引用 0 条，回答「我是「法律助手」小程序内置的中文法律咨询助理，由阿里巴巴云和大模型技术团队提供技…」",
+     "actual": "intent=chat，引用 0 条，回答「我是「法律助手」小程序内置的法律咨询助理，由阿里研发，背靠真实的法律数据库和执业…」",
      "ok": true,
      "prio": "P0"
     },
@@ -1084,7 +1084,7 @@
      "name": "点赞反馈能落库",
      "input": "POST /api/feedback {message_id, rating:1}",
      "expected": "ok=true",
-     "actual": "message_id=368，POST /api/feedback → {'ok': True}",
+     "actual": "message_id=419，POST /api/feedback → {'ok': True}",
      "ok": true,
      "prio": "P1"
     }
@@ -1116,9 +1116,17 @@
      "name": "产物里的构建标记（确认加载的是新包）",
      "input": "dist/utils/api.js",
      "expected": "含 [mp-build] 标记与 chat_once/onChunkReceived",
-     "actual": "标记「P2-3 带去咨询+分享长图+合同上传 2026-09-22a」，关键符号缺=无",
+     "actual": "标记「401 静默重登兜底 2026-09-22b」，关键符号缺=无",
      "ok": true,
      "prio": "P0"
+    },
+    {
+     "name": "401 自愈的四个入口都真的进了包",
+     "input": "dist/utils/api.js",
+     "expected": "4 处 401 分支 + removeStorageSync 清缓存",
+     "actual": "401 分支 4 处（普通请求/分享图/文件上传/整包兜底各一处），token 清理=有",
+     "ok": true,
+     "prio": "P2"
     },
     {
      "name": "跨页共用的徽标/卡片样式在全局（小程序组件样式不外泄）",
@@ -1157,14 +1165,14 @@
   {
    "id": "mp",
    "title": "小程序前端回归（收流 6 形态 + 带去咨询摘要）",
-   "note": "test_watchdog.mjs 加载 dist 真实产物 + 打真后端，逐形态验证：模拟器吞回调走整包兜底、安卓三种 chunk 形态、空 body 转 chat_once、真机无回调 25s 看门狗；test_ask.mjs stub 掉 uni 跑 utils/ask.js 的真实拼接逻辑。",
+   "note": "test_watchdog.mjs 加载 dist 真实产物 + 打真后端，逐形态验证：模拟器吞回调走整包兜底、安卓三种 chunk 形态、空 body 转 chat_once、真机无回调 25s 看门狗；test_ask.mjs stub 掉 uni 跑 utils/ask.js 的真实拼接逻辑；test_relogin.mjs stub 掉 uni 跑 utils/api.js 的 401 静默重登与重放（含并发合并）。",
    "api": "",
    "cases": [
     {
      "name": "模拟器吞掉全部回调 → 直接 chat_once",
      "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"devtools\", \"SWALLOW\": \"1\"}",
      "expected": "整包出答案、0 次流式请求",
-     "actual": "exit=0；platform: devtools | 耗时: 13.8s ／ 流式请求数: 0 | chat_once 请求数: 1 ／ 事件序列: meta, delta:293, done；PASS: 模拟器识别为 devtools，直接整包出答案（293 字）",
+     "actual": "exit=0；platform: devtools | 耗时: 18.9s ／ 流式请求数: 0 | chat_once 请求数: 1 ／ 事件序列: meta, delta:379, done；PASS: 模拟器识别为 devtools，直接整包出答案（379 字）",
      "ok": true,
      "prio": "P0"
     },
@@ -1172,7 +1180,7 @@
      "name": "真机逐块流式（message.data 形态）",
      "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"SHAPE\": \"message\"}",
      "expected": "逐字到达，answer 完整",
-     "actual": "exit=0；platform: android | 耗时: 32.0s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:2, delta:1, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:3, delta:1, delta:1, delta:2, delta:2, delta:1…（截断）",
+     "actual": "exit=0；platform: android | 耗时: 33.1s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:2, delta:1, delta:2, delta:1, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:1, delta:1, delta:2, delta:1, delta:1, delta:2, delta:1, delta:2, delta:2…（截断）",
      "ok": true,
      "prio": "P0"
     },
@@ -1180,7 +1188,7 @@
      "name": "真机安卓 chunk.data 形态",
      "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"SHAPE\": \"data\"}",
      "expected": "同上（白块 bug 的回归位）",
-     "actual": "exit=0；platform: android | 耗时: 33.6s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:3, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:3, delta:1, delta:1, delta:2, delta:1, delta:2, delta:2, delta:1, delta:2, delta:2, delta:1, delta:1, delta:3, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:1, delta:1, delta:1…（截断）",
+     "actual": "exit=0；platform: android | 耗时: 37.2s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:3, delta:1, delta:1, delta:1, delta:2, delta:1, delta:1, delta:2, delta:1, delta:2, delta:2, delta:2, delta:2, delta:1, delta:2, delta:1, delta:2, delta:1, delta:2…（截断）",
      "ok": true,
      "prio": "P0"
     },
@@ -1188,7 +1196,7 @@
      "name": "真机回调直接给裸 buffer",
      "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"SHAPE\": \"raw\"}",
      "expected": "同上",
-     "actual": "exit=0；platform: android | 耗时: 33.0s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:1, delta:1, delta:3, delta:1, delta:2, delta:1, delta:2, delta:2, delta:3, delta:1, delta:1, delta:1, delta:2, delta:2, delta:1, delta:2, delta:2, delta:3, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:3…（截断）",
+     "actual": "exit=0；platform: android | 耗时: 45.8s ／ 流式请求数: 1 | chat_once 请求数: 0 ／ 事件序列: meta, status, status, delta:2, delta:1, delta:2, delta:2, delta:2, delta:1, delta:1, delta:1, delta:1, delta:2, delta:1, delta:2, delta:1, delta:2, delta:1, delta:2, delta:2, delta:1, delta:1, delta:2, delta:2, delta:4, delta:2, delta:2, delta:1, delta:1, delta:2, delta:2, delta:1, delta:2, delta:2, delta:1, delta:1, delta:2, delta:1, delta:1, delta:1, delta:2, delta:3, delta:2, delta:1, delta:3, delta:1, delta:1, delta:2…（截断）",
      "ok": true,
      "prio": "P0"
     },
@@ -1196,7 +1204,7 @@
      "name": "无可用 chunk + success 空串 → 转 chat_once",
      "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"0\", \"EMPTYSTR\": \"1\"}",
      "expected": "不出现空白气泡",
-     "actual": "exit=0；platform: android | 耗时: 29.6s ／ 流式请求数: 1 | chat_once 请求数: 1 ／ 事件序列: meta, delta:284, done；PASS: 真机无可用 chunk + 空 body(空串)，已转 chat_once 补出答案（284 字）",
+     "actual": "exit=0；platform: android | 耗时: 38.2s ／ 流式请求数: 1 | chat_once 请求数: 1 ／ 事件序列: meta, delta:339, done；PASS: 真机无可用 chunk + 空 body(空串)，已转 chat_once 补出答案（339 字）",
      "ok": true,
      "prio": "P0"
     },
@@ -1204,7 +1212,7 @@
      "name": "真机 0 回调 → 25s 看门狗",
      "input": "node test_watchdog.mjs  env={\"PLATFORM\": \"android\", \"SWALLOW\": \"1\"}",
      "expected": "看门狗触发 chat_once 补答",
-     "actual": "exit=0；platform: android | 耗时: 38.2s ／ 流式请求数: 1 | chat_once 请求数: 1 ／ 事件序列: meta, delta:294, done；PASS: 真机无回调时看门狗接管并整包出答案（294 字）",
+     "actual": "exit=0；platform: android | 耗时: 42.3s ／ 流式请求数: 1 | chat_once 请求数: 1 ／ 事件序列: meta, delta:386, done；PASS: 真机无回调时看门狗接管并整包出答案（386 字）",
      "ok": true,
      "prio": "P0"
     },
@@ -1215,13 +1223,21 @@
      "actual": "exit=0；PASS 5 条断言全部通过",
      "ok": true,
      "prio": "P2"
+    },
+    {
+     "name": "401 静默重登与重放（src 真实逻辑）",
+     "input": "node test_relogin.mjs",
+     "expected": "12 条断言全 PASS：重登一次并原样重放 / 旧 token 清出 storage / 并发 401 合并成一次重登 / 第二次 401 不递归 / 500 不重登 / 分享图与上传两条路径各自自愈 / 整包兜底路径照常出答案",
+     "actual": "exit=0；PASS 12 条断言全部通过（重登共 6 次）",
+     "ok": true,
+     "prio": "P2"
     }
    ]
   }
  ],
  "summary": {
-  "total": 139,
-  "passed": 139,
+  "total": 141,
+  "passed": 141,
   "failed": 0,
   "groups": 13
  }

@@ -169,17 +169,21 @@ cmd.exe /c 'cli.bat preview --project D:\mp-preview --qr-format image --qr-outpu
 4. 冷启动第一条消息慢（Ollama 卸载后加载模型 10~20s），后续首字约 7s；可用 `OLLAMA_KEEP_ALIVE` 缓解。
 5. 语音输入（微信同声传译插件）在**个人主体**小程序后台搜不到、加不了，前端按钮已用 `VOICE_ENABLED=false` 关掉，代码保留。
 6. 「保存分享图」的长图是**后端 Pillow 画的**，不是小程序 canvas——模拟器画不出也验不了。存相册这一步依赖 `scope.writePhotosAlbum` 授权，被拒后 `saveImageToPhotosAlbum` 的 fail 里含 `deny/auth`，前端提示去右上角设置里放开；这一步只在真机上验得成。
+7. 换过 `config.json` 的 `jwtSecret`（或 token 满 30 天过期）之后，storage 里的旧 token 会让**所有**接口返回 401，而 `ensureLogin()` 只看「有没有 token」，不清掉就永远登不回来。所以四个出口（普通请求、分享图 arraybuffer、`uploadFile`、`chat_once` 整包）都带自愈：遇 401 清 token → 静默重登（并发请求合并成一次）→ 把原请求重放一次，只重放一次不会递归。
+8. `tools/render_report.py` 打印 PDF 时会**另开一个临时 Chrome profile**：只要机器上有别的 Chrome 在跑（截图脚本、日常浏览器），共用默认 profile 会让 headless 直接退出、一个字节都不写，旧版还会用「文件存在且够大」误报成功。现在改成比对目标文件 mtime，写不进去就明确失败退出（比如那份 PDF 正被查看器开着）。
 
 ### 环境回归自测
 
 ```bash
-cd backend && .venv/Scripts/python.exe ../tools/run_tests.py      # 130 条：接口组按功能分组累积写 docs/report/results.json
+cd backend && .venv/Scripts/python.exe ../tools/run_tests.py      # 141 条：接口组按功能分组累积写 docs/report/results.json
                                                                  # 诉讼费档位/减半/保全封顶、时效对应日与中断中止、
                                                                  # 分享长图（尺寸/体积/确定性/鉴权）、合同 20 规则、
                                                                  # 文书三种模板、要素抽取、追问建议、chat_once、法条检索
-cd backend && .venv/Scripts/python.exe ../tools/run_tests.py --only mp      # 小程序收流 6 形态 + 带去咨询摘要
+cd backend && .venv/Scripts/python.exe ../tools/run_tests.py --only mp      # 小程序收流 6 形态 + 带去咨询摘要 + 401 自愈
 cd backend && .venv/Scripts/python.exe ../tools/run_tests.py --only build   # dist 产物检查（按钮、接口、全局样式在不在包里）
 cd miniprogram && node test_ask.mjs                              # 带去咨询摘要：空项过滤、长度截断、跳转目标
+cd miniprogram && node test_relogin.mjs                          # 401 自愈：stub uni 跑 src/utils/api.js，12 条断言
+cd backend && .venv/Scripts/python.exe ../tools/render_report.py --pdf   # results.json → index.html + 验收测试报告.pdf
 ```
 
 （`tools/test_p1.py` 是 P1 时的 65 条老脚本，已被 `run_tests.py` 的分组跑批取代，留着当参照。）

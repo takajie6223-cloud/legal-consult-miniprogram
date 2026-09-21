@@ -1,6 +1,6 @@
 export const BASE_URL = "http://127.0.0.1:9100"; // 模拟器用 127.0.0.1；真机预览要改成电脑的局域网 IP
 // 若开发者工具里看不到这行日志，说明跑的还是旧产物：菜单→工具→清除缓存→全部清除后重新编译
-console.log("[mp-build] P2-3 带去咨询+分享长图+合同上传 2026-09-22a");
+console.log("[mp-build] 401 静默重登兜底 2026-09-22b");
 
 // 真机拿不到 console 时，把这些计数直接印在空白回答下面，截图即可定位
 export const dbg = { platform: "", chunks: 0, bytes: 0, events: 0, note: "" };
@@ -12,14 +12,42 @@ export function setToken(t) {
   uni.setStorageSync("token", t);
 }
 
-function request(method, path, data) {
+/**
+ * 401 自愈：换过 jwtSecret 或 token 满 30 天之后，storage 里的旧 token 会让每个请求都 401，
+ * 而 ensureLogin 只看「有没有 token」，不清掉就永远登不回来。
+ * 并发请求共用同一次重登，重登成功后由调用方各自把原请求重放一次（只重放一次，不会再递归）。
+ */
+let relogining = null;
+function relogin() {
+  if (relogining) return relogining;
+  token = "";
+  uni.removeStorageSync("token");
+  relogining = ensureLogin(true).then(
+    (v) => { relogining = null; return v; },
+    (e) => { relogining = null; throw e; }
+  );
+  return relogining;
+}
+
+function request(method, path, data, _retried) {
   return new Promise((resolve, reject) => {
     uni.request({
       url: BASE_URL + path,
       method,
       data,
       header: { Authorization: "Bearer " + token },
-      success: (r) => (r.statusCode < 400 ? resolve(r.data) : reject(new Error(r.data.detail || r.statusCode))),
+      success: async (r) => {
+        if (r.statusCode === 401 && !_retried) {
+          try {
+            await relogin();
+            resolve(await request(method, path, data, true));
+          } catch (e) {
+            reject(e);
+          }
+          return;
+        }
+        r.statusCode < 400 ? resolve(r.data) : reject(new Error(r.data.detail || r.statusCode));
+      },
       fail: (e) => reject(new Error(e.errMsg)),
     });
   });
@@ -52,7 +80,7 @@ export const api = {
 };
 
 /** 后端把计算结果画成 PNG 分享图。数值由后端重算，前端不参与。 */
-function requestBuffer(path, body) {
+function requestBuffer(path, body, _retried) {
   return new Promise((resolve, reject) => {
     uni.request({
       url: BASE_URL + path,
@@ -61,10 +89,19 @@ function requestBuffer(path, body) {
       header: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
       data: body,
       responseType: "arraybuffer",
-      success: (r) => {
+      success: async (r) => {
         if (r.statusCode < 400) return resolve(r.data);
         let msg = "HTTP " + r.statusCode;
         try { msg = JSON.parse(utf8Decode(new Uint8Array(r.data))).detail || msg; } catch (e) {}
+        if (r.statusCode === 401 && !_retried) {
+          try {
+            await relogin();
+            resolve(await requestBuffer(path, body, true));
+          } catch (e) {
+            reject(e);
+          }
+          return;
+        }
         reject(new Error(msg));
       },
       fail: (e) => reject(new Error(e.errMsg)),
@@ -112,7 +149,7 @@ export function saveShareCard(path, body) {
  * 合同文件上传：把聊天里选来的 txt/docx 交给后端抽成正文，服务端只回字符串、不留副本。
  * 抽完还是走原来的 /api/contract/review，前端能看见导入的文本，不至于黑箱。
  */
-export function extractContract(filePath, filename) {
+export function extractContract(filePath, filename, _retried) {
   return new Promise((resolve, reject) => {
     uni.uploadFile({
       url: BASE_URL + "/api/contract/extract",
@@ -121,11 +158,18 @@ export function extractContract(filePath, filename) {
       formData: { filename },
       timeout: 30000,
       header: { Authorization: "Bearer " + token },
-      success: (r) => {
+      success: async (r) => {
         let j = null;
         try { j = JSON.parse(r.data); } catch (e) {}
         if (r.statusCode < 400 && j && j.ok) resolve(j);
-        else reject(new Error((j && j.detail) || "HTTP " + r.statusCode));
+        else if (r.statusCode === 401 && !_retried) {
+          try {
+            await relogin();
+            resolve(await extractContract(filePath, filename, true));
+          } catch (e) {
+            reject(e);
+          }
+        } else reject(new Error((j && j.detail) || "HTTP " + r.statusCode));
       },
       fail: (e) => reject(new Error(e.errMsg)),
     });
@@ -270,20 +314,25 @@ export function chatStream(question, sessionId, onEvent, onDone, onErr) {
   // continue_session 让后端在「上一条 user 消息就是本题」时跳过重复插入，
   // 因此模拟器和看门狗两条路径都能安全复用。
   let onceSent = false;
-  function chatOnce(reason) {
-    if (onceSent) return;
-    onceSent = true;
-    fellBack = true;
-    console.warn("[mp-stream] " + reason + "，转 /api/chat_once 整包");
+  function sendOnce(retried) {
     onceTask = uni.request({
       url: BASE_URL + "/api/chat_once",
       method: "POST",
       timeout: 120000,
       header: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
       data: { question, session_id: sessionId, continue_session: true },
-      success: (r) => {
+      success: async (r) => {
         if (aborted) return;
         const j = r && r.data;
+        if (r && r.statusCode === 401 && !retried) {
+          try {
+            await relogin();
+            sendOnce(true);
+          } catch (e) {
+            fail(e);
+          }
+          return;
+        }
         if (!j || r.statusCode >= 400) { fail(new Error((j && j.detail) || "chat_once 失败")); return; }
         onEvent && onEvent({ event: "meta", data: { session_id: j.session_id, intent: j.intent } });
         onEvent && onEvent({ event: "delta", data: { text: j.answer || "" } });
@@ -292,6 +341,13 @@ export function chatStream(question, sessionId, onEvent, onDone, onErr) {
       },
       fail: (e) => fail(new Error(e.errMsg)),
     });
+  }
+  function chatOnce(reason) {
+    if (onceSent) return;
+    onceSent = true;
+    fellBack = true;
+    console.warn("[mp-stream] " + reason + "，转 /api/chat_once 整包");
+    sendOnce(false);
   }
 
   if (inDevtools()) {
