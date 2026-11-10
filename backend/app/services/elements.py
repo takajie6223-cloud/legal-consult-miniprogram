@@ -6,8 +6,8 @@
 
 import re
 
-AMOUNT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(亿元|千万|万|千|元|块钱|块|毛)(?:人民币)?")
-BARE_AMOUNT_RE = re.compile(r"[\s:：是为到]*([\d,]+(?:\.\d+)?)\s*(万|千)?")
+AMOUNT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(亿元|千万|百万|亿|万|千|百|元|块钱|块|毛)(?:人民币)?")
+BARE_AMOUNT_RE = re.compile(r"[\s:：是为到]*([\d,]+(?:\.\d+)?)\s*(亿元|千万|百万|亿|万|千)?")
 DATE_RE = re.compile(
     r"(?:19|20)\d{2}\s*[年\-/.]\s*\d{1,2}\s*[月\-/.]?\s*\d{0,2}\s*日?|"
     r"\d{1,2}\s*月\s*\d{1,2}\s*[日号]|"
@@ -19,18 +19,28 @@ DURATION_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(个月|年|天|周|日|小时)")
 CN_NUM = {"一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
 CN_DURATION_RE = re.compile(r"([一两二三四五六七八九十]+)\s*(个月|年|天|周|日)")
 
+UNIT_TO_MULT = {
+    "亿元": 100_000_000,
+    "亿": 100_000_000,
+    "千万": 10_000_000,
+    "百万": 1_000_000,
+    "万": 10_000,
+    "千": 1_000,
+    "百": 100,
+    "元": 1,
+    "块钱": 1,
+    "块": 1,
+    "毛": 0.1,
+}
+
 
 def _amounts(q: str) -> list[float]:
     out = []
     for m in AMOUNT_RE.finditer(q):
         v = float(m.group(1))
         unit = m.group(2)
-        mult = 10_000 if unit in ("万", "千万", "亿") else 1_000 if unit == "千" else 1
-        if unit == "千万":
-            v *= 10
-        if unit == "亿":
-            v *= 10000
-        out.append(v * mult)
+        mult = UNIT_TO_MULT.get(unit, 1)
+        out.append(round(v * mult, 2))
     return out
 
 
@@ -47,7 +57,8 @@ def _amount_near(q: str, words: list[str], window: int = 14) -> float | None:
             m = BARE_AMOUNT_RE.match(seg)
             if m:
                 v = float(m.group(1).replace(",", ""))
-                return v * (10_000 if m.group(2) == "万" else 1000 if m.group(2) == "千" else 1)
+                u = m.group(2)
+                return round(v * UNIT_TO_MULT.get(u, 1), 2)
             i = q.find(w, i + 1)
     return None
 

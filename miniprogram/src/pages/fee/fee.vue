@@ -14,8 +14,8 @@
           <input class="ipt" type="digit" v-model="form.amount" placeholder="如 100000" placeholder-class="ph" />
         </view>
         <view v-if="form.case_type === 'divorce'" class="row">
-          <text class="lbl">分割财产超过 20 万的部分（元）</text>
-          <input class="ipt" type="digit" v-model="form.property_amount" placeholder="如 300000" placeholder-class="ph" />
+          <text class="lbl">涉及财产分割总额（元）</text>
+          <input class="ipt" type="digit" v-model="form.property_amount" placeholder="不超过20万不另加收，如 500000" placeholder-class="ph" />
         </view>
         <view v-if="form.case_type === 'personality'" class="row">
           <text class="lbl">精神损害请求（元）</text>

@@ -56,11 +56,36 @@ def _percents(t: str) -> list[float]:
     return vals
 
 
+def _illegal_probation(c: str) -> bool:
+    """试用期法定上限：三年以上或无固定期限劳动合同最高不得超过 6 个月。
+    超过 6 个月（如 7 个月以上、1 年）必属违法；合法试用期（如 1 个月、2 个月、3 个月、6 个月）不应误报。
+    """
+    m = re.search(r"试用期\s*(?:超过\s*六\s*个?月|[七八九十]个?月|([0-9]+)\s*个?月|([0-9一二三四五六七八九十]+)\s*年)", c)
+    if not m:
+        return False
+    if m.group(1):
+        return int(m.group(1)) > 6
+    return True
+
+
 def _contract_amount(full: str, clause: str) -> float | None:
-    for hay in (clause, full):
-        vals = _amounts(hay)
+    """提取合同总金额/标的额。
+    必须从全文提取且排除当前违约/定金条款自身，避免子条款金额自比导致 100% 误报。
+    """
+    # 1. 优先匹配明确标注总价/总金额/标的额的句子
+    for m in re.finditer(
+        r"(?:合同(?:总)?(?:价款|金额|总额)|总(?:价款|金额|标的额|价)|标的(?:额|金额)|成交总价|转让款总计)[^\n，。；;]{0,20}?(\d+(?:\.\d+)?\s*(?:亿元|千万|百万|亿|万|千|元))",
+        full or ""
+    ):
+        vals = _amounts(m.group(0))
         if vals:
             return max(vals)
+
+    # 2. 如果全文没有明确的总价关键词，从全文排除本条款后的文本中提取最大金额作为参考
+    f_without_c = full.replace(clause, "") if (full and clause) else (full or "")
+    vals = _amounts(f_without_c)
+    if vals:
+        return max(vals)
     return None
 
 
@@ -261,7 +286,7 @@ RULES: list[dict] = [
     {
         "id": "labor_probation", "level": "高", "title": "试用期或竞业限制条款违法",
         "find": ["试用期", "竞业限制", "保密义务"], "scope": "clause",
-        "check": lambda c, f: bool(re.search(r"试用期\s*[六七八九十]|试用期\s*[6-9]个?月?|试用期\s*\d+\s*个月", c))
+        "check": lambda c, f: _illegal_probation(c)
                               or ("竞业限制" in c and "补偿" not in c),
         "issue": "试用期有上限（三个月以上不满一年不超过一个月；一年以上不满三年不超过二个月；"
                  "三年以上或无固定期限不超过六个月），同一单位只能约定一次；"

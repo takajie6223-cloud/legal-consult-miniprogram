@@ -47,7 +47,7 @@
       <view v-if="res" class="card result">
         <view class="status" :class="res.status">{{ res.status_label }}</view>
         <view class="expiry">{{ res.expiry }}</view>
-        <view class="sub">时效期间 {{ res.period }} · 自 {{ res.start }} 起算{{ res.shifted ? '（到期日顺延至下一工作日）' : '' }}</view>
+        <view class="sub">时效期间 {{ res.period }} · 自 {{ res.start }} 起算{{ (res.shifted && res.shifted.length > 0) ? '（含时效调整顺延）' : '' }}</view>
         <view class="remain">还剩 {{ res.remaining_days }} 天</view>
         <view class="notes">
           <view v-for="(n, i) in res.notes" :key="i" class="note">· {{ n }}</view>
